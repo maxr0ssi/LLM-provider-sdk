@@ -1,0 +1,10 @@
+{
+    "permissions": {
+      "read": {
+        "deny": [
+          "**/.env*"
+        ]
+      }
+    }
+  }
+  

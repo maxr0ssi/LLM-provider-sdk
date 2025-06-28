@@ -1,0 +1,232 @@
+"""Shared pytest fixtures for Steer LLM SDK tests."""
+
+import pytest
+import os
+from unittest.mock import Mock, AsyncMock, patch
+from typing import Dict, Any, List
+
+from steer_llm_sdk.models.generation import (
+    GenerationParams,
+    GenerationResponse,
+    ModelConfig,
+    ProviderType
+)
+from steer_llm_sdk.models.conversation_types import ConversationMessage, TurnRole as ConversationRole
+
+
+@pytest.fixture
+def mock_env_vars(monkeypatch):
+    """Mock environment variables for testing."""
+    env_vars = {
+        "OPENAI_API_KEY": "test-openai-key",
+        "ANTHROPIC_API_KEY": "test-anthropic-key",
+        "XAI_API_KEY": "test-xai-key",
+    }
+    for key, value in env_vars.items():
+        monkeypatch.setenv(key, value)
+    return env_vars
+
+
+@pytest.fixture
+def sample_generation_params():
+    """Sample generation parameters."""
+    return GenerationParams(
+        model="test-model",
+        max_tokens=100,
+        temperature=0.7,
+        top_p=0.95,
+        frequency_penalty=0.0,
+        presence_penalty=0.0,
+        stop=None
+    )
+
+
+@pytest.fixture
+def sample_generation_response():
+    """Sample generation response."""
+    return GenerationResponse(
+        text="This is a test response",
+        model="test-model",
+        usage={
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15
+        },
+        provider="test",
+        finish_reason="stop"
+    )
+
+
+@pytest.fixture
+def sample_model_config():
+    """Sample model configuration."""
+    return ModelConfig(
+        name="test-model",
+        display_name="Test Model",
+        provider=ProviderType.OPENAI,
+        llm_model_id="test-model-id",
+        description="A test model",
+        max_tokens=4096,
+        temperature=0.7,
+        enabled=True,
+        cost_per_1k_tokens=0.001
+    )
+
+
+@pytest.fixture
+def sample_conversation_messages():
+    """Sample conversation messages."""
+    return [
+        ConversationMessage(
+            role=ConversationRole.SYSTEM,
+            content="You are a helpful assistant."
+        ),
+        ConversationMessage(
+            role=ConversationRole.USER,
+            content="What is the weather like?"
+        ),
+        ConversationMessage(
+            role=ConversationRole.ASSISTANT,
+            content="I don't have access to real-time weather data."
+        )
+    ]
+
+
+@pytest.fixture
+def mock_openai_client():
+    """Mock OpenAI client."""
+    client = AsyncMock()
+    
+    # Mock chat completions
+    completion = Mock()
+    completion.choices = [Mock(message=Mock(content="Test response"), finish_reason="stop")]
+    completion.usage = Mock(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+    completion.model = "gpt-4o-mini"
+    
+    client.chat.completions.create = AsyncMock(return_value=completion)
+    
+    # Mock streaming
+    async def mock_stream():
+        chunks = ["Test", " response", " streaming"]
+        for chunk in chunks:
+            delta = Mock(content=chunk)
+            choice = Mock(delta=delta, finish_reason=None)
+            yield Mock(choices=[choice])
+    
+    client.chat.completions.create = AsyncMock(side_effect=lambda **kwargs: 
+        mock_stream() if kwargs.get("stream") else completion
+    )
+    
+    return client
+
+
+@pytest.fixture
+def mock_anthropic_client():
+    """Mock Anthropic client."""
+    client = AsyncMock()
+    
+    # Mock message creation
+    message = Mock()
+    message.content = [Mock(text="Test response")]
+    message.stop_reason = "end_turn"
+    message.usage = Mock(input_tokens=10, output_tokens=5)
+    
+    client.messages.create = AsyncMock(return_value=message)
+    
+    # Mock streaming
+    async def mock_stream():
+        events = [
+            Mock(type="content_block_delta", delta=Mock(text="Test")),
+            Mock(type="content_block_delta", delta=Mock(text=" response")),
+            Mock(type="message_stop", message=Mock(usage=Mock(input_tokens=10, output_tokens=5)))
+        ]
+        for event in events:
+            yield event
+    
+    client.messages.create = AsyncMock(side_effect=lambda **kwargs:
+        mock_stream() if kwargs.get("stream") else message
+    )
+    
+    return client
+
+
+@pytest.fixture
+def mock_xai_client():
+    """Mock xAI client."""
+    client = AsyncMock()
+    
+    # Mock chat creation and sampling
+    chat = Mock()
+    sample_result = Mock(message=Mock(content="Test response"))
+    chat.sample = AsyncMock(return_value=sample_result)
+    
+    client.chat.create = AsyncMock(return_value=chat)
+    
+    # Mock streaming
+    async def mock_stream():
+        for chunk in ["Test", " response"]:
+            yield chunk
+    
+    chat.sample_streaming = AsyncMock(return_value=mock_stream())
+    
+    return client
+
+
+@pytest.fixture
+def mock_local_model():
+    """Mock local HuggingFace model."""
+    model = Mock()
+    tokenizer = Mock()
+    
+    # Mock tokenization
+    tokenizer.encode = Mock(return_value=[1, 2, 3, 4, 5])
+    tokenizer.decode = Mock(return_value="Test response")
+    tokenizer.pad_token_id = 0
+    tokenizer.eos_token_id = 1
+    
+    # Mock generation
+    model.generate = Mock(return_value=Mock(tolist=Mock(return_value=[[1, 2, 3, 4, 5]])))
+    
+    return model, tokenizer
+
+
+@pytest.fixture
+def mock_providers(mock_openai_client, mock_anthropic_client, mock_xai_client):
+    """Mock all provider clients."""
+    with patch("openai.AsyncOpenAI", return_value=mock_openai_client), \
+         patch("anthropic.AsyncAnthropic", return_value=mock_anthropic_client), \
+         patch("xai_sdk.AsyncClient", return_value=mock_xai_client):
+        yield {
+            "openai": mock_openai_client,
+            "anthropic": mock_anthropic_client,
+            "xai": mock_xai_client
+        }
+
+
+@pytest.fixture
+def raw_model_configs():
+    """Raw model configurations for testing."""
+    return {
+        "GPT-4o Mini": {
+            "name": "GPT-4o Mini",
+            "display_name": "GPT-4o Mini",
+            "provider": "openai",
+            "llm_model_id": "gpt-4o-mini",
+            "description": "Fast, cost-effective model",
+            "max_tokens": 4096,
+            "temperature": 0.7,
+            "enabled": True,
+            "cost_per_1k_tokens": 0.00015
+        },
+        "Claude 3.5 Sonnet": {
+            "name": "Claude 3.5 Sonnet",
+            "display_name": "Claude 3.5 Sonnet", 
+            "provider": "anthropic",
+            "llm_model_id": "claude-3-5-sonnet-20241022",
+            "description": "Advanced reasoning model",
+            "max_tokens": 8192,
+            "temperature": 0.7,
+            "enabled": True,
+            "cost_per_1k_tokens": 0.003
+        }
+    }
