@@ -48,7 +48,7 @@ class XAIProvider:
                     formatted.append(assistant(msg.content))
         
         # Create chat and sample response
-        chat = self.client.chat.create(
+        chat = await self.client.chat.create(
             model=params.model,
             messages=formatted,
             max_tokens=params.max_tokens,
@@ -91,7 +91,7 @@ class XAIProvider:
                     formatted.append(assistant(msg.content))
         
         # Create chat and stream response
-        chat = self.client.chat.create(
+        chat = await self.client.chat.create(
             model=params.model,
             messages=formatted,
             max_tokens=params.max_tokens,

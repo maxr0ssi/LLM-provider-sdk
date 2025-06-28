@@ -1,5 +1,3 @@
-
-
 Role: You are an super full stack developer
 Task: you are handling the refactoring of an entire repo. Taking a behemoth repo into one mono repo and 2 private independent PyPI packages.
 
@@ -7,7 +5,7 @@ Task: you are handling the refactoring of an entire repo. Taking a behemoth repo
 Outline:
 ** for reference I am only expecting us to complete stage 1 in this interaction, the remaining stages are so the infrastructure plan is clear and will help guide decision making**
 
-(note for now use Steer directory .venv)
+(note for now use Control_Game .venv)
 Stage 1
 
 Part 1: Research 

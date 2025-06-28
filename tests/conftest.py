@@ -127,7 +127,7 @@ def mock_anthropic_client():
     
     # Mock message creation
     message = Mock()
-    message.content = [Mock(text="Test response")]
+    message.content = [Mock(type="text", text="Test response")]
     message.stop_reason = "end_turn"
     message.usage = Mock(input_tokens=10, output_tokens=5)
     
@@ -157,44 +157,34 @@ def mock_xai_client():
     
     # Mock chat creation and sampling
     chat = Mock()
-    sample_result = Mock(message=Mock(content="Test response"))
+    sample_result = Mock(content="Test response", finish_reason="stop")
     chat.sample = AsyncMock(return_value=sample_result)
     
     client.chat.create = AsyncMock(return_value=chat)
     
     # Mock streaming
     async def mock_stream():
-        for chunk in ["Test", " response"]:
-            yield chunk
+        chunks = ["Test", " response"]
+        for chunk_text in chunks:
+            chunk = Mock(content=chunk_text)
+            yield (Mock(), chunk)
     
-    chat.sample_streaming = AsyncMock(return_value=mock_stream())
+    chat.stream = mock_stream
     
     return client
 
 
-@pytest.fixture
-def mock_local_model():
-    """Mock local HuggingFace model."""
-    model = Mock()
-    tokenizer = Mock()
-    
-    # Mock tokenization
-    tokenizer.encode = Mock(return_value=[1, 2, 3, 4, 5])
-    tokenizer.decode = Mock(return_value="Test response")
-    tokenizer.pad_token_id = 0
-    tokenizer.eos_token_id = 1
-    
-    # Mock generation
-    model.generate = Mock(return_value=Mock(tolist=Mock(return_value=[[1, 2, 3, 4, 5]])))
-    
-    return model, tokenizer
 
 
 @pytest.fixture
 def mock_providers(mock_openai_client, mock_anthropic_client, mock_xai_client):
     """Mock all provider clients."""
+    # Create a flexible mock for AsyncAnthropic that accepts any kwargs
+    def create_anthropic_mock(*args, **kwargs):
+        return mock_anthropic_client
+    
     with patch("openai.AsyncOpenAI", return_value=mock_openai_client), \
-         patch("anthropic.AsyncAnthropic", return_value=mock_anthropic_client), \
+         patch("anthropic.AsyncAnthropic", side_effect=create_anthropic_mock), \
          patch("xai_sdk.AsyncClient", return_value=mock_xai_client):
         yield {
             "openai": mock_openai_client,

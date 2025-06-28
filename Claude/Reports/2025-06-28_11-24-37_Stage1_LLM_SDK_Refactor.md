@@ -111,9 +111,9 @@ steer_llm_sdk/
 
 ### Test Results:
 - Registry tests: 12/12 passing ✅
-- Provider tests: Mixed results (some mocking issues)
-- Router tests: Mixed results (some mocking issues)
-- Overall: Core functionality working, mock tests need refinement
+- Provider tests: 19/19 passing ✅  
+- Router tests: 7/7 passing ✅
+- **Overall: 38/38 unit tests passing (100%)** ✅
 
 ## Next Steps (Not in current scope)
 

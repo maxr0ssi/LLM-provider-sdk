@@ -1,86 +1,54 @@
 # Steer LLM SDK
 
-A unified Python SDK for integrating multiple LLM providers with normalized APIs, streaming support, and advanced features.
+A unified Python SDK for integrating multiple Large Language Model (LLM) providers (OpenAI, Anthropic, xAI) with a consistent interface, intelligent routing, and comprehensive model management.
 
-## Features
+## Overview
 
-- **Multi-Provider Support**: Seamlessly work with OpenAI, Anthropic, xAI, and local HuggingFace models
-- **Normalized API**: Consistent interface across all providers
-- **Streaming Support**: Real-time text generation with async streaming
-- **Conversation Management**: Built-in support for multi-turn conversations
-- **Parameter Validation**: Automatic validation and normalization of generation parameters
-- **Cost Tracking**: Calculate and track API usage costs
+The Steer LLM SDK is the foundational AI integration layer for the Steer ecosystem. It provides:
+
+- **Unified Interface**: Single API for multiple LLM providers
+- **Intelligent Routing**: Automatic provider selection based on model availability
 - **Model Registry**: Centralized configuration for all supported models
-- **Lightweight Availability Checks**: Verify model availability without loading
+- **Cost Tracking**: Built-in usage and cost calculation
+- **Async Support**: Full async/await support for all operations
+- **Streaming**: Real-time streaming responses
+- **Conversation Management**: Native support for multi-turn conversations
+
+## Role in Steer Ecosystem
+
+This SDK serves as the core LLM abstraction layer for all Steer products and services:
+
+- **Steer Platform**: Powers all AI features in the main application
+- **Control Game**: Provides LLM capabilities for game mechanics and AI agents
+- **Future Services**: Foundation for any AI-powered features across Steer products
+
+By centralizing LLM interactions, we ensure:
+- Consistent AI behavior across all products
+- Simplified provider management and switching
+- Unified cost tracking and optimization
+- Single point of updates for new models and providers
 
 ## Installation
 
+### Requirements
+- Python 3.10 or higher
+- API keys for the providers you want to use
+
+### Install from Private PyPI
 ```bash
-pip install steer-llm-sdk
+pip install --index-url http://your-pypi-server/simple/ steer-llm-sdk
 ```
 
-For local model support:
+### Install from Source
 ```bash
-pip install steer-llm-sdk[local]
-```
-
-## Quick Start
-
-```python
-from steer_llm_sdk import LLMRouter, GenerationParams
-
-# Initialize the router
-router = LLMRouter()
-
-# Simple generation
-response = await router.generate(
-    messages="What is the capital of France?",
-    llm_model_id="GPT-4o Mini",
-    raw_params={"temperature": 0.7, "max_tokens": 100}
-)
-print(response.text)
-
-# Conversation support
-from steer_llm_sdk import ConversationMessage, ConversationRole
-
-messages = [
-    ConversationMessage(role=ConversationRole.SYSTEM, content="You are a helpful assistant."),
-    ConversationMessage(role=ConversationRole.USER, content="What is Python?")
-]
-
-response = await router.generate(
-    messages=messages,
-    llm_model_id="Claude 3.5 Sonnet",
-    raw_params={"temperature": 0.5}
-)
-```
-
-## Streaming Example
-
-```python
-# Stream responses
-async for chunk in router.generate_stream(
-    messages="Write a short story about a robot",
-    llm_model_id="GPT-4o Mini",
-    raw_params={"temperature": 0.8}
-):
-    print(chunk, end="", flush=True)
-```
-
-## Available Models
-
-```python
-from steer_llm_sdk import get_available_models
-
-# List all available models
-models = get_available_models()
-for model_id, config in models.items():
-    print(f"{model_id}: {config.provider} - {config.description}")
+git clone https://github.com/steer-ai/steer-llm-sdk.git
+cd steer-llm-sdk
+pip install -e .
 ```
 
 ## Configuration
 
-Set up your API keys as environment variables:
+Set your API keys as environment variables:
 
 ```bash
 export OPENAI_API_KEY="your-openai-key"
@@ -88,67 +56,284 @@ export ANTHROPIC_API_KEY="your-anthropic-key"
 export XAI_API_KEY="your-xai-key"
 ```
 
-## Advanced Usage
+Or use a `.env` file:
+```env
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
+XAI_API_KEY=your-xai-key
+```
+
+## Quick Start
+
+### Basic Usage
+
+```python
+from steer_llm_sdk import generate
+
+# Simple generation (async)
+response = await generate(
+    "Explain quantum computing in simple terms",
+    "gpt-4o-mini"
+)
+print(response)
+```
+
+### Using the Client
+
+```python
+from steer_llm_sdk import SteerLLMClient
+
+# Create client
+client = SteerLLMClient()
+
+# Generate text
+response = await client.generate(
+    "Write a haiku about programming",
+    "claude-3-haiku-20240307"
+)
+
+# Stream responses
+async for chunk in client.stream(
+    "Tell me a story",
+    "gpt-4o-mini"
+):
+    print(chunk, end="")
+```
+
+### Conversation Support
+
+```python
+from steer_llm_sdk import SteerLLMClient, ConversationMessage, ConversationRole
+
+client = SteerLLMClient()
+
+# Multi-turn conversation
+messages = [
+    ConversationMessage(
+        role=ConversationRole.SYSTEM,
+        content="You are a helpful assistant"
+    ),
+    ConversationMessage(
+        role=ConversationRole.USER,
+        content="What's the capital of France?"
+    )
+]
+
+response = await client.generate(messages, "gpt-4o-mini")
+```
+
+### Model Discovery
+
+```python
+from steer_llm_sdk import get_available_models
+
+# Get all available models
+models = get_available_models()
+
+for model_id, config in models.items():
+    print(f"{model_id}: {config.description}")
+    print(f"  Provider: {config.provider}")
+    print(f"  Max tokens: {config.max_tokens}")
+    print(f"  Cost per 1k tokens: ${config.cost_per_1k_tokens}")
+```
+
+## Supported Models
+
+### OpenAI
+- **GPT-4o Mini** (`gpt-4o-mini`) - Efficient, cost-effective model
+- **GPT-4.1 Nano** (`gpt-4.1-nano`) - Ultra-light model for simple tasks
+- **GPT-3.5 Turbo** (`gpt-3.5-turbo`) - Fast general-purpose model
+
+### Anthropic
+- **Claude 3 Haiku** (`claude-3-haiku-20240307`) - Fast and affordable
+- **Claude 3.5 Sonnet** (`claude-3-5-sonnet-20241022`) - Balanced performance
+- **Claude 3 Opus** (`claude-3-opus-20240229`) - Most capable model
+
+### xAI
+- **Grok Beta** (`grok-beta`) - Early access model
+- **Grok 2** (`grok-2-1212`) - Latest production model
+- **Grok 3 Mini** (`grok-3-mini`) - Lightweight variant
+
+## Advanced Features
 
 ### Custom Parameters
 
 ```python
-from steer_llm_sdk import normalize_params, get_config
-
-# Get model configuration
-config = get_config("GPT-4o Mini")
-
-# Normalize parameters for the model
-params = normalize_params({
-    "temperature": 0.9,
-    "max_tokens": 500,
-    "top_p": 0.95
-}, config)
+response = await client.generate(
+    "Generate creative ideas",
+    "gpt-4o-mini",
+    temperature=0.9,
+    max_tokens=500,
+    top_p=0.95
+)
 ```
 
 ### Cost Calculation
 
 ```python
-from steer_llm_sdk import calculate_cost, get_config
-
-# After generation
-usage = {"prompt_tokens": 100, "completion_tokens": 50}
-config = get_config("GPT-4o Mini")
-cost = calculate_cost(usage, config)
-print(f"Generation cost: ${cost:.4f}")
+response = await client.generate("Hello world", "gpt-4o-mini")
+print(f"Cost: ${response.cost_usd:.4f}")
+print(f"Tokens used: {response.usage}")
 ```
 
-### Provider Status
+### Model Availability Check
 
 ```python
-# Check provider availability
-status = router.get_provider_status()
-for provider, available in status.items():
-    print(f"{provider}: {'✓' if available else '✗'}")
+from steer_llm_sdk import check_lightweight_availability
+
+if check_lightweight_availability("gpt-4o-mini"):
+    response = await generate("Hello", "gpt-4o-mini")
+else:
+    print("Model not available")
+```
+
+### Direct Router Usage
+
+```python
+from steer_llm_sdk import llm_router
+
+# For more control, use the router directly
+response = await llm_router.generate(
+    messages="Translate to French: Hello world",
+    llm_model_id="gpt-4o-mini",
+    raw_params={"temperature": 0.3}
+)
+```
+
+## Architecture
+
+The SDK follows a modular architecture:
+
+```
+steer_llm_sdk/
+├── __init__.py          # Public API exports
+├── main.py              # Client implementation
+├── cli.py               # Command-line interface
+├── models/              # Data models and types
+│   ├── generation.py    # Request/response models
+│   └── conversation_types.py  # Conversation support
+├── llm/
+│   ├── providers/       # Provider implementations
+│   │   ├── openai.py
+│   │   ├── anthropic.py
+│   │   └── xai.py
+│   ├── router.py        # Request routing logic
+│   └── registry.py      # Model configuration
+└── config/              # Configuration management
+    └── models.py        # Model definitions
+```
+
+## Development
+
+### Setup Development Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/steer-ai/steer-llm-sdk.git
+cd steer-llm-sdk
+
+# Create virtual environment (Python 3.10+)
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install in development mode
+pip install -e ".[dev]"
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=steer_llm_sdk
+
+# Run specific test file
+pytest tests/unit/test_providers.py
+```
+
+### Code Quality
+
+```bash
+# Format code
+black steer_llm_sdk tests
+
+# Lint code
+ruff check steer_llm_sdk tests
 ```
 
 ## API Reference
 
-### Core Classes
+### Client Methods
 
-- `LLMRouter`: Main router for handling LLM requests
-- `GenerationParams`: Normalized generation parameters
-- `GenerationResponse`: Standardized response format
-- `ConversationMessage`: Message format for conversations
-- `ModelConfig`: Model configuration schema
+- `generate(messages, model, **params)`: Generate text response
+- `stream(messages, model, **params)`: Stream text response  
+- `get_available_models()`: Get all configured models
+- `check_model_availability(model_id)`: Check if model is available
 
-### Key Functions
+### Parameters
 
-- `get_config(llm_model_id)`: Get configuration for a specific model
-- `get_available_models()`: List all enabled models
-- `is_model_available(llm_model_id)`: Check if a model is available
-- `normalize_params(raw_params, config)`: Normalize parameters
-- `calculate_cost(usage, config)`: Calculate generation cost
+- `messages`: String or list of ConversationMessage objects
+- `model`: Model ID string (e.g., "gpt-4o-mini")
+- `temperature`: Controls randomness (0.0-2.0)
+- `max_tokens`: Maximum tokens to generate
+- `top_p`: Nucleus sampling parameter
+- `frequency_penalty`: Reduce repetition
+- `presence_penalty`: Encourage new topics
 
-## License
+## Error Handling
 
-MIT License - see LICENSE file for details.
+```python
+from steer_llm_sdk import SteerLLMClient
+
+client = SteerLLMClient()
+
+try:
+    response = await client.generate("Hello", "gpt-4o-mini")
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+## Performance Considerations
+
+- Models are loaded on-demand to minimize memory usage
+- Streaming is recommended for long responses
+- Use `check_lightweight_availability()` for quick availability checks
+- Cost calculation adds minimal overhead
+
+## Security
+
+- API keys are never logged or stored
+- All provider communications use HTTPS
+- No user data is retained by the SDK
+- Supports custom HTTP proxies if needed
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is proprietary software. All rights reserved by Steer AI.
+
+## Support
+
+For issues and questions:
+- Create an issue on GitHub
+- Contact the Steer team at support@steer.ai
+
+## Changelog
+
+### v0.1.0 (2024-06-28)
+- Initial release
+- Support for OpenAI, Anthropic, and xAI providers
+- Unified interface with streaming support
+- Cost calculation and model registry
+- Python 3.10+ requirement
+- Full async/await support
+- Comprehensive test coverage

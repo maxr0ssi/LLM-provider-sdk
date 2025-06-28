@@ -1,7 +1,7 @@
 # Model configurations - raw data only
 MODEL_CONFIGS = {
     "gpt-4o-mini": {
-        "name": "GPT-4o Mini", 
+        "name": "GPT-4o Mini",
         "display_name": "GPT-4o Mini",
         "provider": "openai",
         "llm_model_id": "gpt-4o-mini",
@@ -11,10 +11,9 @@ MODEL_CONFIGS = {
         "enabled": True,
         "cost_per_1k_tokens": 0.000375  # Combined avg: ($0.15 + $0.60)/2 per 1M = $0.375 per 1M = $0.000375 per 1K
     },
-    
     "gpt-4.1-nano": {
         "name": "GPT-4.1 Nano",
-        "display_name": "GPT-4.1 Nano", 
+        "display_name": "GPT-4.1 Nano",
         "provider": "openai",
         "llm_model_id": "gpt-4.1-nano",
         "description": "Ultra-efficient nano model, perfect for simple evaluations and cost optimization",
@@ -23,8 +22,7 @@ MODEL_CONFIGS = {
         "enabled": True,
         "cost_per_1k_tokens": 0.00025  # Combined avg: ($0.10 + $0.40)/2 per 1M = $0.25 per 1M = $0.00025 per 1K
     },
-
-        "grok-3-mini": {
+    "grok-3-mini": {
         "name": "Grok 3 Mini",
         "display_name": "Grok 3 Mini",
         "provider": "xai",
@@ -70,15 +68,14 @@ PROVIDER_HYPERPARAMETERS = {
         "max_tokens": 500,
         "temperature": 0.7,
         "top_p": 1.0,
-        "frequency_penalty": 0.0,  
-        "presence_penalty": 0.0, 
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
     },
     "anthropic": {
         "max_tokens": 500,
         "temperature": 0.7,
         "top_p": 1.0,
         "top_k": 250,  # Anthropic-specific parameter instead of frequency/presence penalty
-        
     },
         "xai": {
         "max_tokens": 500,
@@ -86,12 +83,6 @@ PROVIDER_HYPERPARAMETERS = {
         "top_p": 1.0,
         "frequency_penalty": 0.0,
         "presence_penalty": 0.0,
-    },
-    "local": {
-        "max_tokens": 500,
-        "temperature": 0.7,
-        "top_p": 1.0,
-        "top_k": 50,   # Common for local models
     }
 }
 

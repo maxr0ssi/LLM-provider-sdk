@@ -3,7 +3,7 @@
 import asyncio
 from typing import Optional, List, Union
 from .llm.router import LLMRouter
-from .models.conversation import ConversationMessage
+from .models.conversation_types import ConversationMessage
 
 
 class SteerLLMClient:

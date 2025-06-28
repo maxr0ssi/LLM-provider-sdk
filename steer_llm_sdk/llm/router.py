@@ -6,7 +6,6 @@ from fastapi.responses import StreamingResponse
 from ..models.conversation_types import ConversationMessage
 from ..models.generation import GenerationParams, GenerationResponse, ProviderType
 from .providers.anthropic import anthropic_provider
-from .providers.local_hf import local_hf_provider
 from .providers.openai import openai_provider
 from .providers.xai import xai_provider
 from .registry import (
@@ -27,7 +26,6 @@ class LLMRouter:
         self.providers = {
             ProviderType.OPENAI: openai_provider,
             ProviderType.ANTHROPIC: anthropic_provider,
-            ProviderType.LOCAL: local_hf_provider,
             ProviderType.XAI: xai_provider,
         }
     

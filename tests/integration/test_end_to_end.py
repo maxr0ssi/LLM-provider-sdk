@@ -8,7 +8,7 @@ from steer_llm_sdk import (
     LLMRouter,
     SteerLLMClient,
     ConversationMessage,
-    TurnRole as ConversationRole,
+    ConversationRole,
     get_available_models,
     generate
 )
@@ -25,7 +25,7 @@ class TestEndToEnd:
         
         result = await client.generate(
             "What is 2+2?",
-            model="GPT-4o Mini",
+            model="gpt-4o-mini",
             temperature=0.5,
             max_tokens=50
         )
@@ -51,7 +51,7 @@ class TestEndToEnd:
         
         result = await client.generate(
             messages,
-            model="Claude 3.5 Sonnet",
+            model="claude-3-haiku",
             temperature=0.7
         )
         
@@ -66,7 +66,7 @@ class TestEndToEnd:
         chunks = []
         async for chunk in client.stream(
             "Write a haiku",
-            model="GPT-4o Mini",
+            model="gpt-4o-mini",
             temperature=0.8
         ):
             chunks.append(chunk)
@@ -75,30 +75,30 @@ class TestEndToEnd:
         full_response = "".join(chunks)
         assert len(full_response) > 0
     
-    def test_get_available_models(self, raw_model_configs):
+    def test_get_available_models(self):
         """Test getting available models."""
-        with patch('steer_llm_sdk.llm.registry.MODEL_CONFIGS', raw_model_configs):
-            models = get_available_models()
-            
-            assert isinstance(models, dict)
-            assert len(models) > 0
-            # All models should be enabled
-            for model_id, config in models.items():
-                assert config["enabled"] is True
+        models = get_available_models()
+        
+        assert isinstance(models, dict)
+        assert len(models) > 0
+        # All models should be ModelConfig objects with enabled=True
+        for model_id, config in models.items():
+            assert hasattr(config, 'enabled')
+            assert config.enabled is True
     
     def test_client_model_availability_check(self, mock_env_vars):
         """Test checking model availability."""
         client = SteerLLMClient()
         
         # Should be available with mocked env vars
-        assert client.check_model_availability("GPT-4o Mini") is True
+        assert client.check_model_availability("gpt-4o-mini") is True
     
     @pytest.mark.asyncio
     async def test_quick_generate_function(self, mock_providers):
         """Test the convenience generate function."""
         result = await generate(
             "Hello world",
-            model="GPT-4o Mini",
+            model="gpt-4o-mini",
             temperature=0.5
         )
         
@@ -110,44 +110,74 @@ class TestEndToEnd:
         """Test router switching between providers."""
         router = LLMRouter()
         
-        # Test OpenAI provider
-        with patch('steer_llm_sdk.llm.registry.get_config') as mock_config:
-            mock_config.return_value.provider = "openai"
-            
-            response = await router.generate(
-                "Test OpenAI",
-                "GPT-4o Mini",
-                {"temperature": 0.7}
-            )
-            
-            assert response.provider == "openai"
+        # Import to check available models
+        from steer_llm_sdk.llm.registry import MODEL_CONFIGS
         
-        # Test Anthropic provider
-        with patch('steer_llm_sdk.llm.registry.get_config') as mock_config:
-            mock_config.return_value.provider = "anthropic"
-            
-            response = await router.generate(
-                "Test Anthropic",
-                "Claude 3.5 Sonnet",
-                {"temperature": 0.7}
-            )
-            
-            assert response.provider == "anthropic"
+        # Test OpenAI provider - use actual model that maps to OpenAI
+        response = await router.generate(
+            "Test OpenAI",
+            "gpt-4o-mini",  # Use the actual model ID from MODEL_CONFIGS
+            {"temperature": 0.7}
+        )
+        
+        assert response.provider == "openai"
+        
+        # Test Anthropic provider - use actual model that maps to Anthropic
+        # Verify the model exists and is anthropic
+        assert "claude-3-haiku" in MODEL_CONFIGS
+        assert MODEL_CONFIGS["claude-3-haiku"].provider == "anthropic"
+        
+        response = await router.generate(
+            "Test Anthropic",
+            "claude-3-haiku",  # Use the actual model ID from MODEL_CONFIGS
+            {"temperature": 0.7}
+        )
+        
+        assert response.provider == "anthropic"
     
     @pytest.mark.asyncio
     async def test_error_handling_no_api_key(self):
         """Test error handling when API key is missing."""
-        with patch.dict('os.environ', {}, clear=True):
+        from fastapi import HTTPException
+        import os
+        
+        # Save original env vars
+        original_openai = os.environ.get('OPENAI_API_KEY')
+        original_anthropic = os.environ.get('ANTHROPIC_API_KEY')
+        original_xai = os.environ.get('XAI_API_KEY')
+        
+        try:
+            # Clear all API keys
+            for key in ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'XAI_API_KEY']:
+                if key in os.environ:
+                    del os.environ[key]
+            
+            # Clear the cache to ensure fresh availability check
+            from steer_llm_sdk.llm.registry import _model_status_cache
+            _model_status_cache.clear()
+            
             router = LLMRouter()
             
-            with pytest.raises(Exception) as exc_info:
+            # The router should raise HTTPException when model is not available
+            with pytest.raises(HTTPException) as exc_info:
                 await router.generate(
                     "Test",
-                    "GPT-4o Mini",
+                    "gpt-4o-mini",  # Use actual model ID
                     {}
                 )
             
-            assert "not available" in str(exc_info.value)
+            # Check that the error message indicates model not available
+            assert exc_info.value.status_code == 400
+            assert "not available" in str(exc_info.value.detail)
+            
+        finally:
+            # Restore original env vars
+            if original_openai:
+                os.environ['OPENAI_API_KEY'] = original_openai
+            if original_anthropic:
+                os.environ['ANTHROPIC_API_KEY'] = original_anthropic
+            if original_xai:
+                os.environ['XAI_API_KEY'] = original_xai
     
     @pytest.mark.asyncio
     async def test_conversation_flow(self, mock_providers):
@@ -193,21 +223,37 @@ class TestEndToEnd:
     @pytest.mark.asyncio
     async def test_parameter_validation(self, mock_providers):
         """Test parameter validation."""
+        from pydantic import ValidationError
+        
         client = SteerLLMClient()
         
-        # Test with invalid temperature (should be clamped)
+        # Test with valid temperature at the boundary
         result = await client.generate(
             "Test",
-            temperature=5.0,  # Too high, should be clamped to 2.0
+            temperature=2.0,  # Maximum valid temperature
             max_tokens=10
         )
         
         assert isinstance(result, str)
         
-        # Test with invalid max_tokens (should be clamped)
+        # Test with valid max_tokens
         result = await client.generate(
             "Test",
-            max_tokens=10000  # Too high, should be clamped to model limit
+            max_tokens=8192  # Maximum valid tokens
         )
         
         assert isinstance(result, str)
+        
+        # Test that invalid values raise ValidationError during normalization
+        from steer_llm_sdk.llm.registry import normalize_params, get_config
+        from steer_llm_sdk.llm.registry import MODEL_CONFIGS
+        
+        # Get a config that exists
+        config = MODEL_CONFIGS["gpt-4o-mini"]
+        
+        # Invalid temperature should raise ValidationError
+        with pytest.raises(ValidationError) as exc_info:
+            normalize_params({"temperature": 5.0}, config)
+        
+        # Check the error is about temperature
+        assert "temperature" in str(exc_info.value)

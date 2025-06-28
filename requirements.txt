@@ -1,0 +1,24 @@
+# Core dependencies for LLM providers
+pydantic>=2.0.0
+openai>=1.0.0
+anthropic>=0.18.0
+xai-sdk>=1.0.0rc1
+jinja2>=3.0.0
+httpx>=0.24.0
+python-dotenv>=1.0.0
+
+# API framework
+fastapi>=0.100.0
+
+# Development and testing dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+black>=23.0.0
+ruff>=0.1.0
+
+# Private PyPI deployment tools
+pypiserver>=2.0.0
+passlib>=1.7.4
+build>=0.10.0
+twine>=4.0.0

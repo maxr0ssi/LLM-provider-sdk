@@ -153,3 +153,21 @@ Thumbs.db
 *.pt
 *.pth
 models/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Test outputs
+test_*.py
+run_tests.py
+
+# Documentation builds
+docs/_build/
+*.pdf
+
+# Private PyPI
+.htpasswd
+pypi-packages/

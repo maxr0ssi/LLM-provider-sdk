@@ -51,17 +51,9 @@ def check_lightweight_availability(llm_model_id: str) -> bool:
         if config.provider == ProviderType.OPENAI:
             available = bool(os.getenv('OPENAI_API_KEY'))
         elif config.provider == ProviderType.ANTHROPIC:
-            available = bool(os.getenv('ANTHROPIC_API_KEY') or os.getenv('CLAUDE_API_KEY'))
+            available = bool(os.getenv('ANTHROPIC_API_KEY'))
         elif config.provider == ProviderType.XAI:
             available = bool(os.getenv('XAI_API_KEY'))
-        elif config.provider == ProviderType.LOCAL:
-            # Just check if dependencies are importable
-            try:
-                import torch
-                import transformers
-                available = True
-            except ImportError:
-                available = False
         else:
             available = False
     except Exception:

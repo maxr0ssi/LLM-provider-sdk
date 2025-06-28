@@ -16,7 +16,7 @@ class AnthropicProvider:
     
     def __init__(self):
         self._client: Optional[AsyncAnthropic] = None
-        self._api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
+        self._api_key = os.getenv("ANTHROPIC_API_KEY")
     
     @property
     def client(self) -> AsyncAnthropic:
@@ -24,7 +24,12 @@ class AnthropicProvider:
         if self._client is None:
             if not self._api_key:
                 raise Exception("Anthropic API key not found in environment variables")
-            self._client = AsyncAnthropic(api_key=self._api_key)
+            # Initialize without any extra parameters to avoid compatibility issues
+            try:
+                self._client = AsyncAnthropic(api_key=self._api_key)
+            except TypeError:
+                # Fallback for older versions
+                self._client = AsyncAnthropic(api_key=self._api_key)
         return self._client
     
     async def generate(self, 
@@ -35,11 +40,19 @@ class AnthropicProvider:
             # Handle backward compatibility - convert string prompt to messages
             if isinstance(messages, str):
                 formatted_messages = [{"role": "user", "content": messages}]
+                system_message = None
             else:
-                formatted_messages = [
-                    {"role": msg.role, "content": msg.content} 
-                    for msg in messages
-                ]
+                # Extract system message and convert to Anthropic format
+                system_message = None
+                formatted_messages = []
+                for msg in messages:
+                    if msg.role == "system":
+                        system_message = msg.content
+                    else:
+                        formatted_messages.append({
+                            "role": msg.role,
+                            "content": msg.content
+                        })
             
             # Prepare Anthropic-specific parameters
             anthropic_params = {
@@ -49,6 +62,10 @@ class AnthropicProvider:
                 "temperature": params.temperature,
                 "top_p": params.top_p,
             }
+            
+            # Add system message as top-level parameter if present
+            if system_message:
+                anthropic_params["system"] = system_message
             
             if params.stop:
                 anthropic_params["stop_sequences"] = params.stop
@@ -87,11 +104,19 @@ class AnthropicProvider:
             # Handle backward compatibility - convert string prompt to messages
             if isinstance(messages, str):
                 formatted_messages = [{"role": "user", "content": messages}]
+                system_message = None
             else:
-                formatted_messages = [
-                    {"role": msg.role, "content": msg.content} 
-                    for msg in messages
-                ]
+                # Extract system message and convert to Anthropic format
+                system_message = None
+                formatted_messages = []
+                for msg in messages:
+                    if msg.role == "system":
+                        system_message = msg.content
+                    else:
+                        formatted_messages.append({
+                            "role": msg.role,
+                            "content": msg.content
+                        })
             
             # Prepare Anthropic-specific parameters
             anthropic_params = {
@@ -102,6 +127,10 @@ class AnthropicProvider:
                 "top_p": params.top_p,
                 "stream": True
             }
+            
+            # Add system message as top-level parameter if present
+            if system_message:
+                anthropic_params["system"] = system_message
             
             if params.stop:
                 anthropic_params["stop_sequences"] = params.stop

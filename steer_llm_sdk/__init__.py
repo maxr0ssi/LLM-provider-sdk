@@ -5,7 +5,6 @@ This package provides a unified interface for multiple LLM providers including:
 - OpenAI (GPT models)
 - Anthropic (Claude models)
 - xAI (Grok models)
-- Local HuggingFace models
 
 Features:
 - Normalized API across all providers
@@ -18,6 +17,7 @@ Features:
 __version__ = "0.1.0"
 
 from .llm.router import LLMRouter, llm_router
+from .main import SteerLLMClient, generate
 from .llm.registry import (
     get_config,
     get_available_models,
@@ -37,6 +37,10 @@ from .models.generation import (
 from .models.conversation_types import ConversationMessage, TurnRole as ConversationRole
 
 __all__ = [
+    # Main client
+    "SteerLLMClient",
+    "generate",
+    
     # Router
     "LLMRouter",
     "llm_router",
