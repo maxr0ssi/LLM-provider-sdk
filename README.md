@@ -28,6 +28,8 @@ By centralizing LLM interactions, we ensure:
 - Unified cost tracking and optimization
 - Single point of updates for new models and providers
 
+> Nexus Integration Brief: The Nexus agent‑mesh docs now live in this repo under `docs/nexus/`. The SDK’s role is SDK‑only plumbing for agents: Responses API mapping (GPT‑5 mini preferred), structured outputs via JSON schema, optional streaming, optional local deterministic tool hooks, determinism/idempotency, and metrics. See `docs/nexus/sdk-deliverables.md` for concrete deliverables and `docs/nexus/agent-sdk-guide.md` for usage patterns.
+
 ## Installation
 
 ### Requirements
@@ -98,6 +100,16 @@ async for chunk in client.stream(
     "gpt-4o-mini"
 ):
     print(chunk, end="")
+
+# Stream with usage data (NEW!)
+response = await client.stream(
+    "Explain Python in one sentence",
+    "gpt-4o-mini",
+    return_usage=True
+)
+print(f"Response: {response.get_text()}")
+print(f"Tokens used: {response.usage['total_tokens']}")
+print(f"Cost: ${response.cost_usd:.6f}")
 ```
 
 ### Conversation Support
@@ -200,6 +212,54 @@ response = await llm_router.generate(
 )
 ```
 
+### Streaming with Usage Data (NEW!)
+
+The SDK now supports getting token usage and cost information from streaming responses:
+
+```python
+from steer_llm_sdk import SteerLLMClient
+
+client = SteerLLMClient()
+
+# Enable usage data collection with return_usage=True
+response = await client.stream(
+    messages="Write a Python function to calculate factorial",
+    model="gpt-4o-mini",
+    temperature=0.7,
+    max_tokens=200,
+    return_usage=True  # New parameter!
+)
+
+# Access the complete response text
+print("Generated code:")
+print(response.get_text())
+
+# Access usage information
+print(f"\nToken usage:")
+print(f"  Prompt tokens: {response.usage['prompt_tokens']}")
+print(f"  Completion tokens: {response.usage['completion_tokens']}")
+print(f"  Total tokens: {response.usage['total_tokens']}")
+
+# Access cost information (when available)
+if response.cost_usd:
+    print(f"\nEstimated cost: ${response.cost_usd:.6f}")
+    if response.cost_breakdown:
+        print(f"  Input cost: ${response.cost_breakdown['input_cost']:.6f}")
+        print(f"  Output cost: ${response.cost_breakdown['output_cost']:.6f}")
+
+# You can also iterate over the collected chunks
+for i, chunk in enumerate(response.chunks):
+    print(f"Chunk {i}: {chunk}")
+```
+
+**Backwards Compatibility**: The default behavior remains unchanged. When `return_usage=False` (default), the stream method yields string chunks as before:
+
+```python
+# Traditional streaming (unchanged)
+async for chunk in client.stream(messages="Hello", model="gpt-4o-mini"):
+    print(chunk, end="")
+```
+
 ## Architecture
 
 The SDK follows a modular architecture:
@@ -268,7 +328,9 @@ ruff check steer_llm_sdk tests
 ### Client Methods
 
 - `generate(messages, model, **params)`: Generate text response
-- `stream(messages, model, **params)`: Stream text response  
+- `stream(messages, model, return_usage=False, **params)`: Stream text response
+  - `return_usage=False` (default): Yields string chunks for backwards compatibility
+  - `return_usage=True`: Returns a `StreamingResponseWithUsage` object with usage data
 - `get_available_models()`: Get all configured models
 - `check_model_availability(model_id)`: Check if model is available
 

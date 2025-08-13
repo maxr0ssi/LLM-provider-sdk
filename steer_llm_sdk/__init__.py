@@ -14,7 +14,7 @@ Features:
 - Conversation support
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from .llm.router import LLMRouter, llm_router
 from .main import SteerLLMClient, generate

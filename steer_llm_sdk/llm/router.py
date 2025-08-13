@@ -10,6 +10,8 @@ from .providers.openai import openai_provider
 from .providers.xai import xai_provider
 from .registry import (
     calculate_cost,
+    calculate_exact_cost,
+    calculate_cache_savings,
     check_lightweight_availability,
     get_available_models,
     get_config,
@@ -59,8 +61,40 @@ class LLMRouter:
         try:
             response = await provider.generate(messages, params)
             
-            # Calculate cost if possible
-            if config.cost_per_1k_tokens:
+            # Calculate exact cost if possible, fallback to estimated cost
+            exact_cost = calculate_exact_cost(response.usage, config.llm_model_id)
+            if exact_cost is not None:
+                # Calculate cache savings for more accurate cost
+                cache_savings = calculate_cache_savings(response.usage, config.llm_model_id)
+                response.cost_usd = exact_cost - cache_savings
+                
+                # Add cost breakdown for transparency
+                from ..LLMConstants import (
+                    GPT4O_MINI_INPUT_COST_PER_1K, GPT4O_MINI_OUTPUT_COST_PER_1K,
+                    GPT41_NANO_INPUT_COST_PER_1K, GPT41_NANO_OUTPUT_COST_PER_1K
+                )
+                
+                prompt_tokens = response.usage.get("prompt_tokens", 0)
+                completion_tokens = response.usage.get("completion_tokens", 0)
+                
+                if config.llm_model_id == "gpt-4o-mini":
+                    input_cost = (prompt_tokens / 1000) * GPT4O_MINI_INPUT_COST_PER_1K
+                    output_cost = (completion_tokens / 1000) * GPT4O_MINI_OUTPUT_COST_PER_1K
+                elif config.llm_model_id == "gpt-4.1-nano":
+                    input_cost = (prompt_tokens / 1000) * GPT41_NANO_INPUT_COST_PER_1K
+                    output_cost = (completion_tokens / 1000) * GPT41_NANO_OUTPUT_COST_PER_1K
+                else:
+                    input_cost = exact_cost / 2  # Fallback approximation
+                    output_cost = exact_cost / 2
+                
+                response.cost_breakdown = {
+                    "input_cost": input_cost,
+                    "output_cost": output_cost,
+                    "cache_savings": cache_savings,
+                    "total_cost": exact_cost - cache_savings
+                }
+                
+            elif config.cost_per_1k_tokens:
                 response.cost_usd = calculate_cost(response.usage, config)
             
             return response
@@ -74,8 +108,21 @@ class LLMRouter:
     async def generate_stream(self, 
                             messages: Union[str, List[ConversationMessage]], 
                             llm_model_id: str, 
-                            raw_params: Dict[str, Any]) -> AsyncGenerator[str, None]:
-        """Generate text with streaming using the appropriate provider with conversation support."""
+                            raw_params: Dict[str, Any],
+                            return_usage: bool = False) -> AsyncGenerator[Union[str, tuple], None]:
+        """Generate text with streaming using the appropriate provider with conversation support.
+        
+        Args:
+            messages: Input messages
+            llm_model_id: Model ID to use
+            raw_params: Parameters for generation
+            return_usage: If True, yields tuples of (chunk, usage_data) where usage_data
+                         is None except for the final yield which contains the usage info
+                         
+        Yields:
+            If return_usage=False: str chunks
+            If return_usage=True: (chunk, usage_data) tuples
+        """
         # Get model configuration
         config = get_config(llm_model_id)
         
@@ -99,8 +146,17 @@ class LLMRouter:
         
         # Generate streaming response
         try:
-            async for chunk in provider.generate_stream(messages, params):
-                yield chunk
+            if return_usage and hasattr(provider, 'generate_stream_with_usage'):
+                # Use the new method if available
+                async for item in provider.generate_stream_with_usage(messages, params):
+                    yield item
+            else:
+                # Fallback to regular streaming without usage data
+                async for chunk in provider.generate_stream(messages, params):
+                    if return_usage:
+                        yield (chunk, None)
+                    else:
+                        yield chunk
                 
         except Exception as e:
             raise HTTPException(

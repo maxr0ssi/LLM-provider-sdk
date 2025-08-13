@@ -16,8 +16,21 @@ _cache_ttl = 600  # 10 minutes cache
 
 
 def get_config(llm_model_id: str) -> ModelConfig:
-    """Get configuration for a specific model."""
-    return MODEL_CONFIGS.get(llm_model_id, MODEL_CONFIGS[DEFAULT_MODEL])
+    """Get configuration for a specific model.
+    
+    Handles both model IDs (e.g., 'gpt-4o-mini') and display names (e.g., 'GPT-4o Mini').
+    """
+    # First try direct lookup
+    if llm_model_id in MODEL_CONFIGS:
+        return MODEL_CONFIGS[llm_model_id]
+    
+    # Try to find by display name
+    for model_id, config in MODEL_CONFIGS.items():
+        if config.display_name == llm_model_id or config.name == llm_model_id:
+            return config
+    
+    # Fallback to default
+    return MODEL_CONFIGS[DEFAULT_MODEL]
 
 
 def get_available_models() -> Dict[str, ModelConfig]:
@@ -67,12 +80,14 @@ def check_lightweight_availability(llm_model_id: str) -> bool:
 def normalize_params(raw_params: Dict, config: ModelConfig) -> GenerationParams:
     """Normalize frontend parameters to GenerationParams."""
     # Handle different parameter naming conventions
+    max_tokens_value = min(
+        raw_params.get("max_tokens", raw_params.get("maxTokens", 512)), 
+        config.max_tokens
+    )
+    
     normalized = {
         "model": config.llm_model_id,
-        "max_tokens": min(
-            raw_params.get("max_tokens", raw_params.get("maxTokens", 512)), 
-            config.max_tokens
-        ),
+        "max_tokens": max_tokens_value,  # Always set for GenerationParams validation
         "temperature": raw_params.get("temperature", config.temperature),
         "top_p": raw_params.get("top_p", raw_params.get("topP", 1.0)),
         "frequency_penalty": raw_params.get("frequency_penalty", raw_params.get("frequencyPenalty", 0.0)),
@@ -80,16 +95,104 @@ def normalize_params(raw_params: Dict, config: ModelConfig) -> GenerationParams:
         "stop": raw_params.get("stop", None)
     }
     
+    # Pass through any additional parameters (like response_format, seed, etc.)
+    # BUT exclude max_tokens from raw_params to avoid duplicates
+    for key, value in raw_params.items():
+        if key not in normalized and key not in ["max_tokens", "maxTokens", "topP", "frequencyPenalty", "presencePenalty"]:
+            normalized[key] = value
+    
     return GenerationParams(**normalized)
 
 
 def calculate_cost(usage: Dict[str, int], config: ModelConfig) -> Optional[float]:
-    """Calculate cost based on usage and model configuration."""
+    """Calculate cost based on usage and model configuration (estimated using combined pricing)."""
     if not config.cost_per_1k_tokens:
         return None
     
     total_tokens = usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0)
     return (total_tokens / 1000) * config.cost_per_1k_tokens
+
+
+def calculate_exact_cost(usage: Dict[str, int], model_id: str) -> Optional[float]:
+    """Calculate exact cost using separate input/output token pricing."""
+    from ..LLMConstants import (
+        GPT4O_MINI_INPUT_COST_PER_1K,
+        GPT4O_MINI_OUTPUT_COST_PER_1K,
+        GPT41_NANO_INPUT_COST_PER_1K,
+        GPT41_NANO_OUTPUT_COST_PER_1K,
+        O4_MINI_INPUT_COST_PER_1K,
+        O4_MINI_OUTPUT_COST_PER_1K,
+        GPT41_MINI_INPUT_COST_PER_1K,
+        GPT41_MINI_OUTPUT_COST_PER_1K
+    )
+    
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+    
+    if model_id == "gpt-4o-mini":
+        input_cost = (prompt_tokens / 1000) * GPT4O_MINI_INPUT_COST_PER_1K
+        output_cost = (completion_tokens / 1000) * GPT4O_MINI_OUTPUT_COST_PER_1K
+        return input_cost + output_cost
+    
+    elif model_id == "gpt-4.1-nano":
+        input_cost = (prompt_tokens / 1000) * GPT41_NANO_INPUT_COST_PER_1K
+        output_cost = (completion_tokens / 1000) * GPT41_NANO_OUTPUT_COST_PER_1K
+        return input_cost + output_cost
+    
+    elif model_id == "o4-mini":
+        input_cost = (prompt_tokens / 1000) * O4_MINI_INPUT_COST_PER_1K
+        output_cost = (completion_tokens / 1000) * O4_MINI_OUTPUT_COST_PER_1K
+        return input_cost + output_cost
+    
+    elif model_id == "gpt-4.1-mini":
+        input_cost = (prompt_tokens / 1000) * GPT41_MINI_INPUT_COST_PER_1K
+        output_cost = (completion_tokens / 1000) * GPT41_MINI_OUTPUT_COST_PER_1K
+        return input_cost + output_cost
+    
+    # For other models, fall back to estimated cost
+    config = get_config(model_id)
+    return calculate_cost(usage, config)
+
+
+def calculate_cache_savings(usage: Dict[str, int], model_id: str) -> float:
+    """Calculate exact cost savings from cache usage."""
+    from ..LLMConstants import (
+        GPT4O_MINI_INPUT_COST_PER_1K,
+        GPT41_NANO_INPUT_COST_PER_1K,
+        O4_MINI_INPUT_COST_PER_1K,
+        O4_MINI_CACHED_INPUT_COST_PER_1K,
+        GPT41_MINI_INPUT_COST_PER_1K,
+        GPT41_MINI_CACHED_INPUT_COST_PER_1K
+    )
+    
+    cache_info = usage.get("cache_info", {})
+    
+    # OpenAI cache savings (cached tokens are input tokens)
+    if "cached_tokens" in cache_info:
+        cached_tokens = cache_info["cached_tokens"]
+        if model_id == "gpt-4o-mini":
+            return (cached_tokens / 1000) * GPT4O_MINI_INPUT_COST_PER_1K
+        elif model_id == "gpt-4.1-nano":
+            return (cached_tokens / 1000) * GPT41_NANO_INPUT_COST_PER_1K
+        elif model_id == "o4-mini":
+            # For o4-mini, calculate the difference between regular and cached pricing
+            regular_cost = (cached_tokens / 1000) * O4_MINI_INPUT_COST_PER_1K
+            cached_cost = (cached_tokens / 1000) * O4_MINI_CACHED_INPUT_COST_PER_1K
+            return regular_cost - cached_cost
+        elif model_id == "gpt-4.1-mini":
+            # For gpt-4.1-mini, calculate the difference between regular and cached pricing
+            regular_cost = (cached_tokens / 1000) * GPT41_MINI_INPUT_COST_PER_1K
+            cached_cost = (cached_tokens / 1000) * GPT41_MINI_CACHED_INPUT_COST_PER_1K
+            return regular_cost - cached_cost
+    
+    # Anthropic cache savings
+    if "cache_read_tokens" in cache_info:
+        cache_read_tokens = cache_info["cache_read_tokens"]
+        # Anthropic Haiku input cost is ~$0.0025 per 1K tokens (combined)
+        # Actual input cost is lower, estimate at $0.0005 per 1K
+        return (cache_read_tokens / 1000) * 0.0005
+    
+    return 0.0
 
 
 def get_default_hyperparameters(provider: str = None) -> dict:

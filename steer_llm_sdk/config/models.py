@@ -9,7 +9,9 @@ MODEL_CONFIGS = {
         "max_tokens": 8192,
         "temperature": 0.7,
         "enabled": True,
-        "cost_per_1k_tokens": 0.000375  # Combined avg: ($0.15 + $0.60)/2 per 1M = $0.375 per 1M = $0.000375 per 1K
+        "cost_per_1k_tokens": 0.000375,  # Combined avg: ($0.15 + $0.60)/2 per 1M = $0.375 per 1M = $0.000375 per 1K
+        "input_cost_per_1k_tokens": 0.00015,  # $0.15 per 1M = $0.00015 per 1K
+        "output_cost_per_1k_tokens": 0.0006   # $0.60 per 1M = $0.0006 per 1K
     },
     "gpt-4.1-nano": {
         "name": "GPT-4.1 Nano",
@@ -20,7 +22,9 @@ MODEL_CONFIGS = {
         "max_tokens": 2048,
         "temperature": 0.7,
         "enabled": True,
-        "cost_per_1k_tokens": 0.00025  # Combined avg: ($0.10 + $0.40)/2 per 1M = $0.25 per 1M = $0.00025 per 1K
+        "cost_per_1k_tokens": 0.00025,  # Combined avg: ($0.10 + $0.40)/2 per 1M = $0.25 per 1M = $0.00025 per 1K
+        "input_cost_per_1k_tokens": 0.0001,   # $0.10 per 1M = $0.0001 per 1K
+        "output_cost_per_1k_tokens": 0.0004   # $0.40 per 1M = $0.0004 per 1K
     },
     "grok-3-mini": {
         "name": "Grok 3 Mini",
@@ -56,6 +60,35 @@ MODEL_CONFIGS = {
         "enabled": True,
         "context_length": 200000,
         "cost_per_1k_tokens": 0.0025  # $0.0025 per 1K tokens (combined input/output)
+    },
+    "o4-mini": {
+        "name": "O4 Mini",
+        "display_name": "O4 Mini",
+        "provider": "openai",
+        "llm_model_id": "o4-mini-2025-04-16",
+        "description": "OpenAI's smaller reasoning model optimized for fast, cost-efficient reasoning.\nExcellent performance in math, coding, and visual tasks",
+        "max_tokens": 100000,
+        "temperature": 0.1,
+        "enabled": True,
+        "context_length": 200000,
+        "cost_per_1k_tokens": 0.00275,  # Combined avg: ($1.10 + $4.40)/2 per 1M = $2.75 per 1M = $0.00275 per 1K
+        "input_cost_per_1k_tokens": 0.0011,   # $1.10 per 1M = $0.0011 per 1K
+        "output_cost_per_1k_tokens": 0.0044,  # $4.40 per 1M = $0.0044 per 1K
+        "cached_input_cost_per_1k_tokens": 0.000275  # $0.275 per 1M = $0.000275 per 1K
+    },
+    "gpt-4.1-mini": {
+        "name": "GPT-4.1 Mini",
+        "display_name": "GPT-4.1 Mini",
+        "provider": "openai",
+        "llm_model_id": "gpt-4.1-mini-2025-04-14",
+        "description": "OpenAI's latest mini model with enhanced capabilities and cost efficiency",
+        "max_tokens": 16384,
+        "temperature": 0.1,
+        "enabled": True,
+        "cost_per_1k_tokens": 0.001,  # Combined avg: ($0.40 + $1.60)/2 per 1M = $1.00 per 1M = $0.001 per 1K
+        "input_cost_per_1k_tokens": 0.0004,   # $0.40 per 1M = $0.0004 per 1K
+        "output_cost_per_1k_tokens": 0.0016,  # $1.60 per 1M = $0.0016 per 1K
+        "cached_input_cost_per_1k_tokens": 0.0001  # $0.10 per 1M = $0.0001 per 1K
     }
 }
 

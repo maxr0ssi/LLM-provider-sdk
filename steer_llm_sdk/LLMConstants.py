@@ -30,14 +30,30 @@ GPT4O_MINI_OUTPUT_COST_PER_1K = GPT4O_MINI_OUTPUT_COST_PER_1M / 1000  # $0.00060
 
 # GPT-4.1 nano Pricing (per 1M tokens, as of 2024) - More cost effective!
 GPT41_NANO_INPUT_COST_PER_1M = 0.10  # $0.10 per 1M input tokens
-GPT41_NANO_OUTPUT_COST_PER_1M = 0.40  # $0.40 per 1M output tokens  
+GPT41_NANO_OUTPUT_COST_PER_1M = 0.40  # $0.40 per 1M output tokens
 GPT41_NANO_INPUT_COST_PER_1K = GPT41_NANO_INPUT_COST_PER_1M / 1000  # $0.0001 per 1K
 GPT41_NANO_OUTPUT_COST_PER_1K = GPT41_NANO_OUTPUT_COST_PER_1M / 1000  # $0.0004 per 1K
 
+# O4-mini Pricing (per 1M tokens, as of 2025)
+O4_MINI_INPUT_COST_PER_1M = 1.10  # $1.10 per 1M input tokens
+O4_MINI_OUTPUT_COST_PER_1M = 4.40  # $4.40 per 1M output tokens
+O4_MINI_CACHED_INPUT_COST_PER_1M = 0.275  # $0.275 per 1M cached input tokens
+O4_MINI_INPUT_COST_PER_1K = O4_MINI_INPUT_COST_PER_1M / 1000  # $0.0011 per 1K
+O4_MINI_OUTPUT_COST_PER_1K = O4_MINI_OUTPUT_COST_PER_1M / 1000  # $0.0044 per 1K
+O4_MINI_CACHED_INPUT_COST_PER_1K = O4_MINI_CACHED_INPUT_COST_PER_1M / 1000  # $0.000275 per 1K
+
+# GPT-4.1-mini Pricing (per 1M tokens, as of 2025)
+GPT41_MINI_INPUT_COST_PER_1M = 0.40  # $0.40 per 1M input tokens
+GPT41_MINI_OUTPUT_COST_PER_1M = 1.60  # $1.60 per 1M output tokens
+GPT41_MINI_CACHED_INPUT_COST_PER_1M = 0.10  # $0.10 per 1M cached input tokens
+GPT41_MINI_INPUT_COST_PER_1K = GPT41_MINI_INPUT_COST_PER_1M / 1000  # $0.0004 per 1K
+GPT41_MINI_OUTPUT_COST_PER_1K = GPT41_MINI_OUTPUT_COST_PER_1M / 1000  # $0.0016 per 1K
+GPT41_MINI_CACHED_INPUT_COST_PER_1K = GPT41_MINI_CACHED_INPUT_COST_PER_1M / 1000  # $0.0001 per 1K
+
 # Realistic Cost Estimation by Complexity (based on actual token usage)
-# Assumptions: 
+# Assumptions:
 # - Simple: ~200 input + 50 output tokens = ~$0.00005 with nano
-# - Medium: ~400 input + 100 output tokens = ~$0.00008 with nano  
+# - Medium: ~400 input + 100 output tokens = ~$0.00008 with nano
 # - Complex: ~600 input + 200 output tokens = ~$0.00014 with mini
 LLM_COST_SIMPLE = 0.00005   # GPT-4.1 nano for simple evaluations
 LLM_COST_MEDIUM = 0.00008   # GPT-4.1 nano for medium evaluations

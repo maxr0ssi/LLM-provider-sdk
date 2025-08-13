@@ -65,7 +65,18 @@ class AnthropicProvider:
             
             # Add system message as top-level parameter if present
             if system_message:
-                anthropic_params["system"] = system_message
+                # Enable prompt caching for long system messages (like Anthropic's guide)
+                if len(system_message) > 1024:  # Only cache long system prompts
+                    anthropic_params["system"] = [
+                        {
+                            "type": "text", 
+                            "text": system_message,
+                            "cache_control": {"type": "ephemeral"}
+                        }
+                    ]
+                    print(f"💾 Anthropic: Caching system prompt ({len(system_message)} chars)")
+                else:
+                    anthropic_params["system"] = system_message
             
             if params.stop:
                 anthropic_params["stop_sequences"] = params.stop
@@ -79,10 +90,34 @@ class AnthropicProvider:
                 if content_block.type == "text":
                     text_content += content_block.text
             
+            # Check for cache headers/indicators (Anthropic explicit caching)
+            cache_info = {}
+            if hasattr(response, 'usage'):
+                usage_dict = response.usage.model_dump() if hasattr(response.usage, 'model_dump') else response.usage.__dict__
+                
+                # Check for cache creation (first time caching)
+                if hasattr(response.usage, 'cache_creation_input_tokens'):
+                    cache_creation = response.usage.cache_creation_input_tokens
+                    cache_info["cache_creation_input_tokens"] = cache_creation
+                    if cache_creation > 0:
+                        print(f"💾 Anthropic Cache CREATION: {cache_creation} tokens cached for future use")
+                
+                # Check for cache read (cache hit)
+                if hasattr(response.usage, 'cache_read_input_tokens'):
+                    cache_read = response.usage.cache_read_input_tokens
+                    cache_info["cache_read_input_tokens"] = cache_read
+                    if cache_read > 0:
+                        print(f"🎯 Anthropic Cache HIT: {cache_read} tokens read from cache")
+                        print(f"   💰 Cost savings: ~{(cache_read / 1000) * 0.003:.6f} USD saved")
+                
+                # Log full usage for debugging
+                print(f"🔍 Anthropic Usage Details: {usage_dict}")
+            
             usage = {
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens + response.usage.output_tokens
+                "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
+                "cache_info": cache_info
             }
             
             return GenerationResponse(
@@ -143,6 +178,150 @@ class AnthropicProvider:
                     if hasattr(event.delta, 'text'):
                         yield event.delta.text
                         
+        except Exception as e:
+            raise Exception(f"Anthropic streaming error: {str(e)}")
+    
+    async def generate_stream_with_usage(self, 
+                                       messages: Union[str, List[ConversationMessage]], 
+                                       params: GenerationParams) -> AsyncGenerator[tuple, None]:
+        """Generate text using Anthropic API with streaming and usage data.
+        
+        Yields tuples of (chunk, usage_data) where usage_data is None except
+        for the final yield which contains the complete usage information.
+        """
+        try:
+            # Handle backward compatibility - convert string prompt to messages
+            if isinstance(messages, str):
+                formatted_messages = [{"role": "user", "content": messages}]
+                system_message = None
+            else:
+                # Extract system message and convert to Anthropic format
+                system_message = None
+                formatted_messages = []
+                for msg in messages:
+                    # Handle both ConversationMessage objects and plain dicts
+                    if hasattr(msg, 'role'):
+                        role = msg.role
+                        content = msg.content
+                    elif isinstance(msg, dict):
+                        role = msg.get('role')
+                        content = msg.get('content')
+                    else:
+                        raise ValueError(f"Invalid message format: {type(msg)} - {msg}")
+                    
+                    if role == "system":
+                        system_message = content
+                    else:
+                        formatted_messages.append({
+                            "role": role,
+                            "content": content
+                        })
+            
+            # Prepare Anthropic-specific parameters
+            anthropic_params = {
+                "model": params.model,
+                "messages": formatted_messages,
+                "max_tokens": params.max_tokens,
+                "temperature": params.temperature,
+                "top_p": params.top_p,
+                "stream": True
+            }
+            
+            # Add system message as top-level parameter if present
+            if system_message:
+                # Enable prompt caching for long system messages (like Anthropic's guide)
+                if len(system_message) > 1024:  # Only cache long system prompts
+                    anthropic_params["system"] = [
+                        {
+                            "type": "text", 
+                            "text": system_message,
+                            "cache_control": {"type": "ephemeral"}
+                        }
+                    ]
+                    print(f"💾 Anthropic: Caching system prompt ({len(system_message)} chars)")
+                else:
+                    anthropic_params["system"] = system_message
+            
+            if params.stop:
+                anthropic_params["stop_sequences"] = params.stop
+            
+            # Make streaming API call
+            stream = await self.client.messages.create(**anthropic_params)
+            
+            collected_chunks = []
+            finish_reason = None
+            usage_data = None
+            
+            async for event in stream:
+                if event.type == "content_block_delta":
+                    if hasattr(event.delta, 'text'):
+                        chunk = event.delta.text
+                        collected_chunks.append(chunk)
+                        yield (chunk, None)
+                
+                elif event.type == "message_delta":
+                    # Capture usage data from message_delta event
+                    if hasattr(event, 'usage'):
+                        usage_data = event.usage
+                    if hasattr(event.delta, 'stop_reason'):
+                        finish_reason = event.delta.stop_reason
+                
+                elif event.type == "message_stop":
+                    # Final event - process usage data
+                    if usage_data:
+                        # Extract usage information
+                        usage_dict = usage_data.model_dump() if hasattr(usage_data, 'model_dump') else usage_data.__dict__
+                        
+                        # Check for cache information
+                        cache_info = {}
+                        if hasattr(usage_data, 'cache_creation_input_tokens'):
+                            cache_creation = usage_data.cache_creation_input_tokens
+                            cache_info["cache_creation_input_tokens"] = cache_creation
+                            if cache_creation > 0:
+                                print(f"💾 Anthropic Cache CREATION: {cache_creation} tokens cached for future use")
+                        
+                        if hasattr(usage_data, 'cache_read_input_tokens'):
+                            cache_read = usage_data.cache_read_input_tokens
+                            cache_info["cache_read_input_tokens"] = cache_read
+                            if cache_read > 0:
+                                print(f"🎯 Anthropic Cache HIT: {cache_read} tokens read from cache")
+                                print(f"   💰 Cost savings: ~{(cache_read / 1000) * 0.003:.6f} USD saved")
+                        
+                        usage = {
+                            "prompt_tokens": usage_data.input_tokens,
+                            "completion_tokens": usage_data.output_tokens,
+                            "total_tokens": usage_data.input_tokens + usage_data.output_tokens,
+                            "cache_info": cache_info
+                        }
+                        
+                        # Calculate cost
+                        from ..registry import calculate_exact_cost, calculate_cache_savings, get_config
+                        config = get_config(params.model)
+                        exact_cost = calculate_exact_cost(usage, config.llm_model_id)
+                        cost_breakdown = None
+                        
+                        if exact_cost is not None:
+                            cache_savings = calculate_cache_savings(usage, config.llm_model_id)
+                            cost_usd = exact_cost - cache_savings
+                            
+                            # Simple cost breakdown for Anthropic
+                            cost_breakdown = {
+                                "input_cost": (usage["prompt_tokens"] / 1000) * (config.input_cost_per_1k_tokens or 0),
+                                "output_cost": (usage["completion_tokens"] / 1000) * (config.output_cost_per_1k_tokens or 0),
+                                "cache_savings": cache_savings,
+                                "total_cost": cost_usd
+                            }
+                        
+                        # Yield final usage data
+                        yield (None, {
+                            "usage": usage,
+                            "model": params.model,
+                            "provider": "anthropic",
+                            "finish_reason": finish_reason,
+                            "cost_usd": cost_usd if 'cost_usd' in locals() else None,
+                            "cost_breakdown": cost_breakdown
+                        })
+                    
         except Exception as e:
             raise Exception(f"Anthropic streaming error: {str(e)}")
     
