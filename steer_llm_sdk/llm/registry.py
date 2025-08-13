@@ -3,6 +3,7 @@ import os
 import time
 from ..models.generation import ModelConfig, GenerationParams, ProviderType
 from ..config.models import MODEL_CONFIGS as RAW_MODEL_CONFIGS, DEFAULT_MODEL, PROVIDER_HYPERPARAMETERS, DEFAULT_MODEL_HYPERPARAMETERS
+from ..agents.models.capabilities import ProviderCapabilities, get_model_capabilities
 
 
 # Convert raw configs to Pydantic models
@@ -104,17 +105,45 @@ def normalize_params(raw_params: Dict, config: ModelConfig) -> GenerationParams:
     return GenerationParams(**normalized)
 
 
-def calculate_cost(usage: Dict[str, int], config: ModelConfig) -> Optional[float]:
-    """Calculate cost based on usage and model configuration (estimated using combined pricing)."""
-    if not config.cost_per_1k_tokens:
-        return None
+def get_capabilities(llm_model_id: str) -> ProviderCapabilities:
+    """Get capabilities for a specific model.
     
-    total_tokens = usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0)
-    return (total_tokens / 1000) * config.cost_per_1k_tokens
+    Args:
+        llm_model_id: Model ID to get capabilities for
+        
+    Returns:
+        ProviderCapabilities object
+    """
+    config = get_config(llm_model_id)
+    return get_model_capabilities(config.llm_model_id)
+
+
+def calculate_cost(usage: Dict[str, int], config: ModelConfig) -> Optional[float]:
+    """Calculate cost based on usage and model configuration using exact pricing."""
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+    
+    if config.input_cost_per_1k_tokens and config.output_cost_per_1k_tokens:
+        input_cost = (prompt_tokens / 1000) * config.input_cost_per_1k_tokens
+        output_cost = (completion_tokens / 1000) * config.output_cost_per_1k_tokens
+        return input_cost + output_cost
+    
+    return None
 
 
 def calculate_exact_cost(usage: Dict[str, int], model_id: str) -> Optional[float]:
     """Calculate exact cost using separate input/output token pricing."""
+    config = get_config(model_id)
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+    
+    # Use model config pricing if available
+    if config.input_cost_per_1k_tokens and config.output_cost_per_1k_tokens:
+        input_cost = (prompt_tokens / 1000) * config.input_cost_per_1k_tokens
+        output_cost = (completion_tokens / 1000) * config.output_cost_per_1k_tokens
+        return input_cost + output_cost
+    
+    # Fall back to hardcoded values for legacy support
     from ..LLMConstants import (
         GPT4O_MINI_INPUT_COST_PER_1K,
         GPT4O_MINI_OUTPUT_COST_PER_1K,
@@ -125,9 +154,6 @@ def calculate_exact_cost(usage: Dict[str, int], model_id: str) -> Optional[float
         GPT41_MINI_INPUT_COST_PER_1K,
         GPT41_MINI_OUTPUT_COST_PER_1K
     )
-    
-    prompt_tokens = usage.get("prompt_tokens", 0)
-    completion_tokens = usage.get("completion_tokens", 0)
     
     if model_id == "gpt-4o-mini":
         input_cost = (prompt_tokens / 1000) * GPT4O_MINI_INPUT_COST_PER_1K
@@ -150,7 +176,6 @@ def calculate_exact_cost(usage: Dict[str, int], model_id: str) -> Optional[float
         return input_cost + output_cost
     
     # For other models, fall back to estimated cost
-    config = get_config(model_id)
     return calculate_cost(usage, config)
 
 

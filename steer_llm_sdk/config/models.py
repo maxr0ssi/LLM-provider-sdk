@@ -9,7 +9,6 @@ MODEL_CONFIGS = {
         "max_tokens": 8192,
         "temperature": 0.7,
         "enabled": True,
-        "cost_per_1k_tokens": 0.000375,  # Combined avg: ($0.15 + $0.60)/2 per 1M = $0.375 per 1M = $0.000375 per 1K
         "input_cost_per_1k_tokens": 0.00015,  # $0.15 per 1M = $0.00015 per 1K
         "output_cost_per_1k_tokens": 0.0006   # $0.60 per 1M = $0.0006 per 1K
     },
@@ -22,7 +21,6 @@ MODEL_CONFIGS = {
         "max_tokens": 2048,
         "temperature": 0.7,
         "enabled": True,
-        "cost_per_1k_tokens": 0.00025,  # Combined avg: ($0.10 + $0.40)/2 per 1M = $0.25 per 1M = $0.00025 per 1K
         "input_cost_per_1k_tokens": 0.0001,   # $0.10 per 1M = $0.0001 per 1K
         "output_cost_per_1k_tokens": 0.0004   # $0.40 per 1M = $0.0004 per 1K
     },
@@ -35,7 +33,23 @@ MODEL_CONFIGS = {
         "max_tokens": 8192,
         "temperature": 0.7,
         "enabled": True,
-        "cost_per_1k_tokens": 0.0004  # Combined avg: ($0.30 + $0.50)/2 per 1M = $0.40 per 1M = $0.0004 per 1K
+        "input_cost_per_1k_tokens": 0.0003,   # $0.30 per 1M = $0.0003 per 1K
+        "output_cost_per_1k_tokens": 0.0005   # $0.50 per 1M = $0.0005 per 1K
+    },
+
+    "gpt-5-mini": {
+        "name": "GPT-5 Mini",
+        "display_name": "GPT-5 Mini",
+        "provider": "openai",
+        "llm_model_id": "gpt-5-mini",
+        "description": "Next-generation mini model with full Responses API support and larger context window",
+        "max_tokens": 32768,
+        "temperature": 0.7,
+        "enabled": True,
+        "context_length": 256000,  # 256K context window
+        "input_cost_per_1k_tokens": 0.00025,   # $0.250 per 1M = $0.00025 per 1K
+        "output_cost_per_1k_tokens": 0.002,    # $2.000 per 1M = $0.002 per 1K
+        "cached_input_cost_per_1k_tokens": 0.000025  # $0.025 per 1M = $0.000025 per 1K
     },
 
     "gpt-3.5-turbo": {
@@ -47,7 +61,8 @@ MODEL_CONFIGS = {
         "max_tokens": 4096,
         "temperature": 0.7,
         "enabled": True,
-        "cost_per_1k_tokens": 0.002  # $0.002 per 1K tokens (combined input/output)
+        "input_cost_per_1k_tokens": 0.0005,   # $0.50 per 1M = $0.0005 per 1K
+        "output_cost_per_1k_tokens": 0.0015   # $1.50 per 1M = $0.0015 per 1K
     },
     "claude-3-haiku": {
         "name": "Claude 3 Haiku",
@@ -59,7 +74,9 @@ MODEL_CONFIGS = {
         "temperature": 0.7,
         "enabled": True,
         "context_length": 200000,
-        "cost_per_1k_tokens": 0.0025  # $0.0025 per 1K tokens (combined input/output)
+        "input_cost_per_1k_tokens": 0.0003,   # $0.30 per 1M = $0.0003 per 1K (Anthropic pricing estimated)
+        "output_cost_per_1k_tokens": 0.0015,  # $1.50 per 1M = $0.0015 per 1K
+        "cached_input_cost_per_1k_tokens": 0.00007  # ~$0.07 per 1M = $0.00007 per 1K
     },
     "o4-mini": {
         "name": "O4 Mini",
@@ -71,7 +88,6 @@ MODEL_CONFIGS = {
         "temperature": 0.1,
         "enabled": True,
         "context_length": 200000,
-        "cost_per_1k_tokens": 0.00275,  # Combined avg: ($1.10 + $4.40)/2 per 1M = $2.75 per 1M = $0.00275 per 1K
         "input_cost_per_1k_tokens": 0.0011,   # $1.10 per 1M = $0.0011 per 1K
         "output_cost_per_1k_tokens": 0.0044,  # $4.40 per 1M = $0.0044 per 1K
         "cached_input_cost_per_1k_tokens": 0.000275  # $0.275 per 1M = $0.000275 per 1K
@@ -85,7 +101,6 @@ MODEL_CONFIGS = {
         "max_tokens": 16384,
         "temperature": 0.1,
         "enabled": True,
-        "cost_per_1k_tokens": 0.001,  # Combined avg: ($0.40 + $1.60)/2 per 1M = $1.00 per 1M = $0.001 per 1K
         "input_cost_per_1k_tokens": 0.0004,   # $0.40 per 1M = $0.0004 per 1K
         "output_cost_per_1k_tokens": 0.0016,  # $1.60 per 1M = $0.0016 per 1K
         "cached_input_cost_per_1k_tokens": 0.0001  # $0.10 per 1M = $0.0001 per 1K

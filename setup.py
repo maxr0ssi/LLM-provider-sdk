@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="steer-llm-sdk",
-    version="0.1.2",
+    version="0.2.0",
     author="Max Rossi",
     author_email="maxrossi2002@hotmail.co.uk",
     description="Multi-provider LLM integration SDK with normalization and validation",
@@ -32,6 +32,7 @@ setup(
         "anthropic>=0.18.0",
         "xai-sdk>=1.0.0rc1",
         "jinja2>=3.0.0",
+        "jsonschema>=4.0.0",
         "fastapi>=0.100.0",
         "httpx>=0.24.0",
         "python-dotenv>=1.0.0",

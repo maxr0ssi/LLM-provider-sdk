@@ -1,18 +1,21 @@
-import os
+import json
 import logging
-from typing import Dict, Any, AsyncGenerator, Optional, List, Union
-from dotenv import load_dotenv
+import os
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+
 import openai
+from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-# Load environment variables
-load_dotenv()
-
-from ...models.generation import GenerationParams, GenerationResponse
+from ...agents.errors import ProviderError
 from ...models.conversation_types import ConversationMessage
+from ...models.generation import GenerationParams, GenerationResponse
+from ..capabilities import get_capabilities_for_model
 
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
 
 class OpenAIProvider:
     """OpenAI API provider with conversation support."""
@@ -36,6 +39,10 @@ class OpenAIProvider:
             self._client = AsyncOpenAI(api_key=self._api_key, timeout=self._timeout)
         return self._client
     
+    def _supports_responses_api(self, model_name: str) -> bool:
+        caps = get_capabilities_for_model(model_name)
+        return bool(caps.supports_json_schema)
+
     async def generate(self, 
                       messages: Union[str, List[ConversationMessage]], 
                       params: GenerationParams) -> GenerationResponse:
@@ -76,26 +83,22 @@ class OpenAIProvider:
                 "presence_penalty": params.presence_penalty,
             }
             
-            # Force temperature=1 for o4-mini models (they don't support other values)
-            if (params.model.lower().startswith("o4-mini") or params.model.lower() == "o4-mini") and params.temperature != 1.0:
-                logger.warning(f"o4-mini models only support temperature=1.0, overriding from {params.temperature}")
-                openai_params["temperature"] = 1.0
-            
-            # Cap temperature at 0.1 for gpt-4.1-mini for better consistency
-            if params.model.lower().startswith("gpt-4.1-mini") and params.temperature > 0.1:
-                logger.info(f"gpt-4.1-mini temperature capped at 0.1, overriding from {params.temperature}")
-                openai_params["temperature"] = 0.1
+            # Apply capability-driven temperature behavior
+            caps = get_capabilities_for_model(params.model)
+            if caps.fixed_temperature is not None:
+                if params.temperature != caps.fixed_temperature:
+                    logger.info("Model enforces fixed temperature=%s; overriding from %s", caps.fixed_temperature, params.temperature)
+                openai_params["temperature"] = caps.fixed_temperature
+            else:
+                if not caps.supports_temperature:
+                    openai_params.pop("temperature", None)
             
             # Use max_completion_tokens for new models (o4-mini, gpt-4.1-mini, o1-*)
             # Check model name to determine which parameter to use
-            model_lower = params.model.lower()
-            logger.debug(f"Model: {params.model}, checking if it needs max_completion_tokens")
-            
-            if any(model_lower.startswith(prefix.lower()) for prefix in ["o4-mini", "gpt-4.1-mini", "o1-"]):
-                logger.info(f"Using max_completion_tokens for model {params.model}")
+            logger.debug("Selecting max tokens parameter by capability")
+            if caps.uses_max_completion_tokens:
                 openai_params["max_completion_tokens"] = params.max_tokens
             else:
-                logger.debug(f"Using max_tokens for model {params.model}")
                 openai_params["max_tokens"] = params.max_tokens
             
             if params.stop:
@@ -118,7 +121,107 @@ class OpenAIProvider:
                     if value is not None:
                         openai_params[field_name] = value
             
-            # Make API call
+            # Prefer Responses API for supported models when schema is requested
+            if params.response_format and self._supports_responses_api(params.model):
+                rf = params.response_format or {}
+                schema_cfg = rf.get("json_schema") or rf.get("schema")
+                text_config = None
+                if schema_cfg:
+                    # Ensure root additionalProperties=false as required by Responses API
+                    try:
+                        schema_root = dict(schema_cfg)
+                    except Exception:
+                        schema_root = schema_cfg
+                    if isinstance(schema_root, dict) and "additionalProperties" not in schema_root:
+                        schema_root["additionalProperties"] = False
+                    text_config = {
+                        "format": {
+                            "type": "json_schema",
+                            "name": rf.get("name", "result"),
+                            "schema": schema_root,
+                            "strict": rf.get("strict", None),
+                        }
+                    }
+                model_lower = params.model.lower()
+                responses_payload: Dict[str, Any] = {
+                    "model": params.model,
+                    "input": formatted_messages,
+                }
+                # Optionally map first system message to `instructions` for Responses API
+                use_instructions = getattr(params, "responses_use_instructions", False)
+                if use_instructions and formatted_messages and formatted_messages[0].get("role") == "system":
+                    responses_payload["instructions"] = formatted_messages[0].get("content", "")
+                    # Remove system from input if using instructions
+                    responses_payload["input"] = formatted_messages[1:]
+                if "gpt-5-mini" not in model_lower:
+                    responses_payload["temperature"] = openai_params.get("temperature")
+                responses_payload["top_p"] = openai_params.get("top_p")
+                # Max output tokens naming differs on some models
+                caps = get_capabilities_for_model(params.model)
+                if caps.uses_max_completion_tokens:
+                    responses_payload["max_output_tokens"] = openai_params.get("max_completion_tokens", params.max_tokens)
+                else:
+                    responses_payload["max_tokens"] = params.max_tokens
+                if params.seed is not None:
+                    responses_payload["seed"] = params.seed
+                if params.stop:
+                    responses_payload["stop"] = params.stop
+                if text_config is not None:
+                    responses_payload["text"] = text_config
+                # Optional: reasoning and metadata pass-through if provided
+                if hasattr(params, "reasoning") and getattr(params, "reasoning") is not None:
+                    responses_payload["reasoning"] = getattr(params, "reasoning")
+                if hasattr(params, "metadata") and getattr(params, "metadata") is not None:
+                    responses_payload["metadata"] = getattr(params, "metadata")
+
+                response = await self.client.responses.create(**responses_payload, timeout=self._timeout)
+
+                # Extract text or structured output
+                text_content = None
+                if hasattr(response, "output_text") and response.output_text:
+                    text_content = response.output_text
+                elif hasattr(response, "output") and response.output:
+                    try:
+                        first = response.output[0]
+                        if hasattr(first, "content") and first.content:
+                            part = first.content[0]
+                            # part may have .text or .json
+                            if hasattr(part, "text") and part.text is not None:
+                                text_content = part.text
+                            elif hasattr(part, "json") and part.json is not None:
+                                text_content = json.dumps(part.json)
+                    except Exception:
+                        text_content = None
+
+                if text_content is None:
+                    text_content = ""
+
+                # Usage extraction
+                usage = {}
+                if hasattr(response, "usage") and response.usage is not None:
+                    usage_obj = response.usage
+                    # Try common fields
+                    prompt_tokens = getattr(usage_obj, "input_tokens", None) or getattr(usage_obj, "prompt_tokens", 0)
+                    completion_tokens = getattr(usage_obj, "output_tokens", None) or getattr(usage_obj, "completion_tokens", 0)
+                    total_tokens = getattr(usage_obj, "total_tokens", None)
+                    if total_tokens is None:
+                        total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
+                    usage = {
+                        "prompt_tokens": prompt_tokens or 0,
+                        "completion_tokens": completion_tokens or 0,
+                        "total_tokens": total_tokens,
+                        "cache_info": {}
+                    }
+
+                return GenerationResponse(
+                    text=text_content,
+                    model=params.model,
+                    usage=usage,
+                    provider="openai",
+                    finish_reason=None
+                )
+
+            # Fallback: Chat Completions API
             response = await self.client.chat.completions.create(**openai_params, timeout=self._timeout)
             
             # Extract response data
@@ -140,15 +243,14 @@ class OpenAIProvider:
                         cached_tokens = prompt_details['cached_tokens']
                         cache_info["cached_tokens"] = cached_tokens
                         if cached_tokens > 0:
-                            print(f"🎯 OpenAI Cache HIT: {cached_tokens} tokens cached from previous requests")  # DISABLED FOR DEMO
-                            print(f"   💰 Cost savings: ~{(cached_tokens / 1000) * 0.000150:.6f} USD saved")  # DISABLED FOR DEMO
+                            logger.debug("OpenAI cache hit: %s tokens cached (approx savings included)", cached_tokens)
                 
                 # Also check direct cached_tokens field (alternative location)
                 if 'cached_tokens' in usage_dict:
                     cached_tokens = usage_dict['cached_tokens']
                     cache_info["cached_tokens"] = cached_tokens
                     if cached_tokens > 0:
-                        print(f"🎯 OpenAI Cache HIT: {cached_tokens} tokens cached")  # DISABLED FOR DEMO
+                        logger.debug("OpenAI cache hit: %s tokens cached", cached_tokens)
                 
                 # Log full usage for debugging
                 # print(f"🔍 OpenAI Usage Details: {usage_dict}")  # DISABLED FOR DEMO
@@ -169,7 +271,7 @@ class OpenAIProvider:
             )
             
         except Exception as e:
-            raise Exception(f"OpenAI API error: {str(e)}")
+            raise ProviderError(f"OpenAI API error: {str(e)}")
     
     async def generate_stream(self, 
                             messages: Union[str, List[ConversationMessage]], 
@@ -196,47 +298,96 @@ class OpenAIProvider:
             openai_params = {
                 "model": params.model,
                 "messages": formatted_messages,
-                "temperature": params.temperature,
                 "top_p": params.top_p,
                 "frequency_penalty": params.frequency_penalty,
                 "presence_penalty": params.presence_penalty,
                 "stream": True
             }
+            # Capability-driven temperature
+            caps = get_capabilities_for_model(params.model)
+            if caps.fixed_temperature is not None:
+                openai_params["temperature"] = caps.fixed_temperature
+            elif caps.supports_temperature:
+                openai_params["temperature"] = params.temperature
             
-            # Force temperature=1 for o4-mini models (they don't support other values)
-            if (params.model.lower().startswith("o4-mini") or params.model.lower() == "o4-mini") and params.temperature != 1.0:
-                logger.warning(f"o4-mini models only support temperature=1.0, overriding from {params.temperature}")
-                openai_params["temperature"] = 1.0
-            
-            # Cap temperature at 0.1 for gpt-4.1-mini for better consistency
-            if params.model.lower().startswith("gpt-4.1-mini") and params.temperature > 0.1:
-                logger.info(f"gpt-4.1-mini temperature capped at 0.1, overriding from {params.temperature}")
-                openai_params["temperature"] = 0.1
-            
-            # Use max_completion_tokens for new models (o4-mini, gpt-4.1-mini, o1-*)
-            # Check model name to determine which parameter to use
-            model_lower = params.model.lower()
-            logger.debug(f"Model: {params.model}, checking if it needs max_completion_tokens")
-            
-            if any(model_lower.startswith(prefix.lower()) for prefix in ["o4-mini", "gpt-4.1-mini", "o1-"]):
-                logger.info(f"Using max_completion_tokens for model {params.model}")
+            # Max tokens param by capability
+            if caps.uses_max_completion_tokens:
                 openai_params["max_completion_tokens"] = params.max_tokens
             else:
-                logger.debug(f"Using max_tokens for model {params.model}")
                 openai_params["max_tokens"] = params.max_tokens
             
             if params.stop:
                 openai_params["stop"] = params.stop
             
-            # Make streaming API call
+            # Responses API streaming for supported models with schema
+            if params.response_format and self._supports_responses_api(params.model):
+                try:
+                    rf = params.response_format or {}
+                    schema_cfg = rf.get("json_schema") or rf.get("schema")
+                    text_config = None
+                    if schema_cfg:
+                        try:
+                            schema_root = dict(schema_cfg)
+                        except Exception:
+                            schema_root = schema_cfg
+                        if isinstance(schema_root, dict) and "additionalProperties" not in schema_root:
+                            schema_root["additionalProperties"] = False
+                        text_config = {
+                            "format": {
+                                "type": "json_schema",
+                                "name": rf.get("name", "result"),
+                                "schema": schema_root,
+                                "strict": rf.get("strict", None),
+                            }
+                        }
+                    model_lower = params.model.lower()
+                    responses_payload: Dict[str, Any] = {
+                        "model": params.model,
+                        "input": formatted_messages,
+                        "stream": True,
+                    }
+                    use_instructions = getattr(params, "responses_use_instructions", False)
+                    if use_instructions and formatted_messages and formatted_messages[0].get("role") == "system":
+                        responses_payload["instructions"] = formatted_messages[0].get("content", "")
+                        responses_payload["input"] = formatted_messages[1:]
+                    if "gpt-5-mini" not in model_lower:
+                        responses_payload["temperature"] = openai_params.get("temperature")
+                    responses_payload["top_p"] = openai_params.get("top_p")
+                    caps = get_capabilities_for_model(params.model)
+                    if caps.uses_max_completion_tokens:
+                        responses_payload["max_output_tokens"] = openai_params.get("max_completion_tokens", params.max_tokens)
+                    else:
+                        responses_payload["max_tokens"] = params.max_tokens
+                    if params.seed is not None:
+                        responses_payload["seed"] = params.seed
+                    if params.stop:
+                        responses_payload["stop"] = params.stop
+                    if text_config is not None:
+                        responses_payload["text"] = text_config
+                    if hasattr(params, "reasoning") and getattr(params, "reasoning") is not None:
+                        responses_payload["reasoning"] = getattr(params, "reasoning")
+                    if hasattr(params, "metadata") and getattr(params, "metadata") is not None:
+                        responses_payload["metadata"] = getattr(params, "metadata")
+
+                    stream = await self.client.responses.create(**responses_payload, timeout=self._timeout)
+                    # Fallback: some SDKs return an async iterator directly
+                    async for event in stream:
+                        # Best-effort: yield text deltas if present
+                        delta = getattr(event, "delta", None) or getattr(event, "output_text", None)
+                        if delta:
+                            yield str(delta)
+                    return
+                except Exception as e:
+                    logger.debug("Responses API streaming unavailable or failed, falling back: %s", e)
+
+            # Fallback to Chat Completions streaming
             stream = await self.client.chat.completions.create(**openai_params, timeout=self._timeout)
-            
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
                     
         except Exception as e:
-            raise Exception(f"OpenAI streaming error: {str(e)}")
+            raise ProviderError(f"OpenAI streaming error: {str(e)}")
     
     async def generate_stream_with_usage(self, 
                                        messages: Union[str, List[ConversationMessage]], 
@@ -276,34 +427,23 @@ class OpenAIProvider:
             openai_params = {
                 "model": params.model,
                 "messages": formatted_messages,
-                "temperature": params.temperature,
                 "top_p": params.top_p,
                 "frequency_penalty": params.frequency_penalty,
                 "presence_penalty": params.presence_penalty,
                 "stream": True,
                 "stream_options": {"include_usage": True}  # Request usage data in stream
             }
-            
-            # Force temperature=1 for o4-mini models (they don't support other values)
-            if (params.model.lower().startswith("o4-mini") or params.model.lower() == "o4-mini") and params.temperature != 1.0:
-                logger.warning(f"o4-mini models only support temperature=1.0, overriding from {params.temperature}")
-                openai_params["temperature"] = 1.0
-            
-            # Cap temperature at 0.1 for gpt-4.1-mini for better consistency
-            if params.model.lower().startswith("gpt-4.1-mini") and params.temperature > 0.1:
-                logger.info(f"gpt-4.1-mini temperature capped at 0.1, overriding from {params.temperature}")
-                openai_params["temperature"] = 0.1
-            
-            # Use max_completion_tokens for new models (o4-mini, gpt-4.1-mini, o1-*)
-            # Check model name to determine which parameter to use
-            model_lower = params.model.lower()
-            logger.debug(f"Model: {params.model}, checking if it needs max_completion_tokens")
-            
-            if any(model_lower.startswith(prefix.lower()) for prefix in ["o4-mini", "gpt-4.1-mini", "o1-"]):
-                logger.info(f"Using max_completion_tokens for model {params.model}")
+            # Capability-driven temperature
+            caps = get_capabilities_for_model(params.model)
+            if caps.fixed_temperature is not None:
+                openai_params["temperature"] = caps.fixed_temperature
+            elif caps.supports_temperature:
+                openai_params["temperature"] = params.temperature
+
+            # Max tokens param by capability
+            if caps.uses_max_completion_tokens:
                 openai_params["max_completion_tokens"] = params.max_tokens
             else:
-                logger.debug(f"Using max_tokens for model {params.model}")
                 openai_params["max_tokens"] = params.max_tokens
             
             if params.stop:
@@ -315,7 +455,83 @@ class OpenAIProvider:
             if params.seed is not None:
                 openai_params["seed"] = params.seed
             
-            # Make streaming API call
+            # Responses API streaming for supported models with schema (include usage if available)
+            if params.response_format and self._supports_responses_api(params.model):
+                try:
+                    rf = params.response_format or {}
+                    schema_cfg = rf.get("json_schema") or rf.get("schema")
+                    text_config = None
+                    if schema_cfg:
+                        try:
+                            schema_root = dict(schema_cfg)
+                        except Exception:
+                            schema_root = schema_cfg
+                        if isinstance(schema_root, dict) and "additionalProperties" not in schema_root:
+                            schema_root["additionalProperties"] = False
+                        text_config = {
+                            "format": {
+                                "type": "json_schema",
+                                "name": rf.get("name", "result"),
+                                "schema": schema_root,
+                                "strict": rf.get("strict", None),
+                            }
+                        }
+                    model_lower = params.model.lower()
+                    responses_payload: Dict[str, Any] = {
+                        "model": params.model,
+                        "input": formatted_messages,
+                        "stream": True,
+                    }
+                    use_instructions = getattr(params, "responses_use_instructions", False)
+                    if use_instructions and formatted_messages and formatted_messages[0].get("role") == "system":
+                        responses_payload["instructions"] = formatted_messages[0].get("content", "")
+                        responses_payload["input"] = formatted_messages[1:]
+                    if "gpt-5-mini" not in model_lower:
+                        responses_payload["temperature"] = openai_params.get("temperature")
+                    responses_payload["top_p"] = openai_params.get("top_p")
+                    caps = get_capabilities_for_model(params.model)
+                    if caps.uses_max_completion_tokens:
+                        responses_payload["max_output_tokens"] = openai_params.get("max_completion_tokens", params.max_tokens)
+                    else:
+                        responses_payload["max_tokens"] = params.max_tokens
+                    if params.seed is not None:
+                        responses_payload["seed"] = params.seed
+                    if params.stop:
+                        responses_payload["stop"] = params.stop
+                    if text_config is not None:
+                        responses_payload["text"] = text_config
+                    if hasattr(params, "reasoning") and getattr(params, "reasoning") is not None:
+                        responses_payload["reasoning"] = getattr(params, "reasoning")
+                    if hasattr(params, "metadata") and getattr(params, "metadata") is not None:
+                        responses_payload["metadata"] = getattr(params, "metadata")
+
+                    stream = await self.client.responses.create(**responses_payload, timeout=self._timeout)
+                    collected = []
+                    async for event in stream:
+                        delta = getattr(event, "delta", None) or getattr(event, "output_text", None)
+                        if delta:
+                            text = str(delta)
+                            collected.append(text)
+                            yield (text, None)
+                    # After stream completes, no usage extracted (API variance); yield final usage as None
+                    yield (None, {
+                        "usage": {
+                            "prompt_tokens": 0,
+                            "completion_tokens": 0,
+                            "total_tokens": 0,
+                            "cache_info": {}
+                        },
+                        "model": params.model,
+                        "provider": "openai",
+                        "finish_reason": None,
+                        "cost_usd": None,
+                        "cost_breakdown": None
+                    })
+                    return
+                except Exception as e:
+                    logger.debug("Responses API streaming (with usage) unavailable or failed, falling back: %s", e)
+
+            # Fallback to Chat Completions streaming with usage
             stream = await self.client.chat.completions.create(**openai_params, timeout=self._timeout)
             
             collected_chunks = []
@@ -348,8 +564,7 @@ class OpenAIProvider:
                             cached_tokens = prompt_details['cached_tokens']
                             cache_info["cached_tokens"] = cached_tokens
                             if cached_tokens > 0:
-                                print(f"🎯 OpenAI Cache HIT: {cached_tokens} tokens cached from previous requests")
-                                print(f"   💰 Cost savings: ~{(cached_tokens / 1000) * 0.000150:.6f} USD saved")
+                                logger.debug("OpenAI cache hit: %s tokens cached (approx savings)", cached_tokens)
                     
                     usage = {
                         "prompt_tokens": chunk.usage.prompt_tokens,
@@ -359,7 +574,7 @@ class OpenAIProvider:
                     }
                     
                     # Calculate cost
-                    from ..registry import calculate_exact_cost, calculate_cache_savings, get_config
+                    from ..registry import calculate_cache_savings, calculate_exact_cost, get_config
                     config = get_config(params.model)
                     exact_cost = calculate_exact_cost(usage, config.llm_model_id)
                     cost_breakdown = None
@@ -370,8 +585,10 @@ class OpenAIProvider:
                         
                         # Add cost breakdown
                         from ...LLMConstants import (
-                            GPT4O_MINI_INPUT_COST_PER_1K, GPT4O_MINI_OUTPUT_COST_PER_1K,
-                            GPT41_NANO_INPUT_COST_PER_1K, GPT41_NANO_OUTPUT_COST_PER_1K
+                            GPT4O_MINI_INPUT_COST_PER_1K,
+                            GPT4O_MINI_OUTPUT_COST_PER_1K,
+                            GPT41_NANO_INPUT_COST_PER_1K,
+                            GPT41_NANO_OUTPUT_COST_PER_1K,
                         )
                         
                         prompt_tokens = usage.get("prompt_tokens", 0)
@@ -405,7 +622,7 @@ class OpenAIProvider:
                     })
                     
         except Exception as e:
-            raise Exception(f"OpenAI streaming error: {str(e)}")
+            raise ProviderError(f"OpenAI streaming error: {str(e)}")
     
     def is_available(self) -> bool:
         """Check if OpenAI API is available."""
