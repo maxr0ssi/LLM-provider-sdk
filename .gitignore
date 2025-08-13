@@ -152,7 +152,6 @@ Thumbs.db
 *.bin
 *.pt
 *.pth
-models/
 
 # Temporary files
 *.tmp
