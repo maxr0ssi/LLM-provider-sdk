@@ -42,7 +42,7 @@ By centralizing LLM interactions, we ensure:
 pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main
 
 # Or install a specific version/tag
-pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.2.0
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.2.1
 
 # Or install from a specific branch
 pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@agents

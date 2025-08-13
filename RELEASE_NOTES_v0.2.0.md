@@ -30,10 +30,10 @@ Install directly from this release:
 
 ```bash
 # Using the wheel file
-pip install https://github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.2.0/steer_llm_sdk-0.2.0-py3-none-any.whl
+pip install https://github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.2.1/steer_llm_sdk-0.2.1-py3-none-any.whl
 
 # Or from source
-pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.2.0
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.2.1
 ```
 
 ## 💰 Updated Pricing
@@ -86,4 +86,4 @@ This release represents Phase 1 of the Nexus integration, establishing the found
 
 ---
 
-**Full Changelog**: https://github.com/maxr0ssi/LLM-provider-sdk/compare/v0.1.2...v0.2.0
+**Full Changelog**: https://github.com/maxr0ssi/LLM-provider-sdk/compare/v0.1.2...v0.2.1

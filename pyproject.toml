@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "steer-llm-sdk"
-version = "0.2.0"
+version = "0.2.1"
 description = "Multi-provider LLM integration SDK with normalization and validation"
 readme = "README.md"
 authors = [{name = "Max Rossi"}]
