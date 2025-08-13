@@ -1,5 +1,6 @@
 import os
 from typing import Dict, Any, AsyncGenerator, Optional, List, Union
+import logging
 from dotenv import load_dotenv
 import xai_sdk
 from xai_sdk import AsyncClient
@@ -10,6 +11,9 @@ from xai_sdk.chat import system, user, assistant
 
 from ...models.generation import GenerationParams, GenerationResponse
 from ...models.conversation_types import ConversationMessage
+
+
+logger = logging.getLogger(__name__)
 
 
 class XAIProvider:
@@ -61,7 +65,12 @@ class XAIProvider:
         response = await chat.sample()
         
         # Note: xai_sdk.AsyncClient's sample() does not expose token usage by default
-        usage: Dict[str, int] = {}
+        usage: Dict[str, int] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cache_info": {},
+        }
         
         return GenerationResponse(
             text=response.content,

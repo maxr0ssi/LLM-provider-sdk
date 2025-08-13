@@ -113,6 +113,11 @@ class ProviderCapabilities(BaseModel):
 - Post‑hoc schema validation for providers without native JSON schema.
 - Deterministic mode: propagate `seed` if supported; clamp parameters (e.g., `temperature=0`) when `deterministic=True`.
 
+##### OpenAI Responses API integration details
+- Target models: `gpt-4.1-mini`, `gpt-5-mini` (preferred). 
+- The SDK uses the Responses API for these models when `json_schema` is provided (structured outputs) and falls back to Chat Completions otherwise.
+- See the detailed mapping, streaming, determinism, and example requests in: [`docs/openai-responses-api.md`](../openai-responses-api.md)
+
 #### Provider addition: GPT‑5 mini (OpenAI Responses API)
 - Add model entry to `config/models.py` (e.g., key `"gpt-5-mini"`) with tokens, default temperature, context length, and pricing fields.
 - Extend `LLMConstants.py` with input/output (and cached, if applicable) per‑1K pricing for GPT‑5 mini; wire into `registry.calculate_exact_cost` and `calculate_cache_savings`.
@@ -120,6 +125,9 @@ class ProviderCapabilities(BaseModel):
 - OpenAI adapter: when model is GPT‑5 mini and `json_schema` present, send via Responses API with `response_format={"type":"json_schema","json_schema":...}`; keep Chat Completions fallback for non‑schema requests if needed.
 - Deterministic defaults: clamp temperature (≤0.1) when `deterministic=True` and pass `seed`.
 - Tests: golden structured output fixtures; seeded determinism; streaming with usage; cost calculation including cache savings.
+
+##### Additional references
+- Responses API usage guide (models, streaming, schema): [`docs/openai-responses-api.md`](../openai-responses-api.md)
 
 ### Phase 4: Determinism & Idempotency (Week 2–3)
 - Implement `IdempotencyManager` (in‑memory; pluggable interface) with `check_duplicate/store_result/cleanup_expired`.

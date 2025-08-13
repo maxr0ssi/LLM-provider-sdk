@@ -1,5 +1,6 @@
 import os
 from typing import Dict, Any, AsyncGenerator, Optional, List, Union
+import logging
 from dotenv import load_dotenv
 import anthropic
 from anthropic import AsyncAnthropic
@@ -9,6 +10,9 @@ load_dotenv()
 
 from ...models.generation import GenerationParams, GenerationResponse
 from ...models.conversation_types import ConversationMessage
+
+
+logger = logging.getLogger(__name__)
 
 
 class AnthropicProvider:
@@ -74,7 +78,7 @@ class AnthropicProvider:
                             "cache_control": {"type": "ephemeral"}
                         }
                     ]
-                    print(f"💾 Anthropic: Caching system prompt ({len(system_message)} chars)")
+                    logger.debug("Anthropic: caching system prompt (%s chars)", len(system_message))
                 else:
                     anthropic_params["system"] = system_message
             
@@ -110,8 +114,8 @@ class AnthropicProvider:
                         print(f"🎯 Anthropic Cache HIT: {cache_read} tokens read from cache")
                         print(f"   💰 Cost savings: ~{(cache_read / 1000) * 0.003:.6f} USD saved")
                 
-                # Log full usage for debugging
-                print(f"🔍 Anthropic Usage Details: {usage_dict}")
+                # Log usage for debugging
+                logger.debug("Anthropic usage: %s", usage_dict)
             
             usage = {
                 "prompt_tokens": response.usage.input_tokens,
@@ -238,7 +242,7 @@ class AnthropicProvider:
                             "cache_control": {"type": "ephemeral"}
                         }
                     ]
-                    print(f"💾 Anthropic: Caching system prompt ({len(system_message)} chars)")
+                    logger.debug("Anthropic: caching system prompt (%s chars)", len(system_message))
                 else:
                     anthropic_params["system"] = system_message
             
@@ -278,14 +282,13 @@ class AnthropicProvider:
                             cache_creation = usage_data.cache_creation_input_tokens
                             cache_info["cache_creation_input_tokens"] = cache_creation
                             if cache_creation > 0:
-                                print(f"💾 Anthropic Cache CREATION: {cache_creation} tokens cached for future use")
+                                logger.debug("Anthropic cache creation: %s tokens", cache_creation)
                         
                         if hasattr(usage_data, 'cache_read_input_tokens'):
                             cache_read = usage_data.cache_read_input_tokens
                             cache_info["cache_read_input_tokens"] = cache_read
                             if cache_read > 0:
-                                print(f"🎯 Anthropic Cache HIT: {cache_read} tokens read from cache")
-                                print(f"   💰 Cost savings: ~{(cache_read / 1000) * 0.003:.6f} USD saved")
+                                logger.debug("Anthropic cache hit: %s tokens", cache_read)
                         
                         usage = {
                             "prompt_tokens": usage_data.input_tokens,

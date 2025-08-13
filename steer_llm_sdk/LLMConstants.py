@@ -50,6 +50,14 @@ GPT41_MINI_INPUT_COST_PER_1K = GPT41_MINI_INPUT_COST_PER_1M / 1000  # $0.0004 pe
 GPT41_MINI_OUTPUT_COST_PER_1K = GPT41_MINI_OUTPUT_COST_PER_1M / 1000  # $0.0016 per 1K
 GPT41_MINI_CACHED_INPUT_COST_PER_1K = GPT41_MINI_CACHED_INPUT_COST_PER_1M / 1000  # $0.0001 per 1K
 
+# GPT-5 mini Pricing (per 1M tokens, as of August 2025)
+GPT5_MINI_INPUT_COST_PER_1M = 0.25  # $0.25 per 1M input tokens
+GPT5_MINI_OUTPUT_COST_PER_1M = 2.00  # $2.00 per 1M output tokens
+GPT5_MINI_CACHED_INPUT_COST_PER_1M = 0.0625  # $0.0625 per 1M cached input tokens (25% of input cost)
+GPT5_MINI_INPUT_COST_PER_1K = GPT5_MINI_INPUT_COST_PER_1M / 1000  # $0.00025 per 1K
+GPT5_MINI_OUTPUT_COST_PER_1K = GPT5_MINI_OUTPUT_COST_PER_1M / 1000  # $0.002 per 1K
+GPT5_MINI_CACHED_INPUT_COST_PER_1K = GPT5_MINI_CACHED_INPUT_COST_PER_1M / 1000  # $0.000025 per 1K
+
 # Realistic Cost Estimation by Complexity (based on actual token usage)
 # Assumptions:
 # - Simple: ~200 input + 50 output tokens = ~$0.00005 with nano
