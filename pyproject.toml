@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "steer-llm-sdk"
-version = "0.1.2"
+version = "0.2.0"
 description = "Multi-provider LLM integration SDK with normalization and validation"
 readme = "README.md"
 authors = [{name = "Max Rossi"}]
@@ -26,6 +26,7 @@ dependencies = [
     "anthropic>=0.18.0",
     "xai-sdk>=1.0.0rc1",
     "jinja2>=3.0.0",
+    "jsonschema>=4.0.0",
     "fastapi>=0.100.0",
     "httpx>=0.24.0",
     "python-dotenv>=1.0.0",

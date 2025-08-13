@@ -36,15 +36,22 @@ By centralizing LLM interactions, we ensure:
 - Python 3.10 or higher
 - API keys for the providers you want to use
 
-### Install from Private PyPI
+### Install from GitHub (Recommended)
 ```bash
-pip install --index-url http://your-pypi-server/simple/ steer-llm-sdk
+# Install directly from GitHub
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main
+
+# Or install a specific version/tag
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.2.0
+
+# Or install from a specific branch
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@agents
 ```
 
-### Install from Source
+### Install from Source (Development)
 ```bash
-git clone https://github.com/steer-ai/steer-llm-sdk.git
-cd steer-llm-sdk
+git clone https://github.com/maxr0ssi/LLM-provider-sdk.git
+cd LLM-provider-sdk
 pip install -e .
 ```
 
