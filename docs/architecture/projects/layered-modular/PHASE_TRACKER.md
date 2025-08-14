@@ -140,82 +140,32 @@ steer_llm_sdk/
 **Progress**: 100%
 **Dependencies**: Phase 1 complete
 
-#### Tasks:
+#### Tasks Completed
 - [x] 2.1 Capability Audit (verify all shipped models' flags: supports_json_schema, supports_temperature, fixed_temperature, uses_max_completion_tokens, supports_seed, supports_prompt_caching)
 - [x] 2.2 Capability-Driven Routing (ensure router/policy paths rely only on capabilities, no name heuristics)
 - [x] 2.3 Provider Capability Handling (providers reference normalization + capabilities consistently; remove any residual name checks)
 
-#### Detailed Plan (Phase 2)
+### Phase 3: Provider Adapter Clean Split 🟢
+**Status**: COMPLETE (2025-08-15) — Reviewed and Verified
+**Target**: 1–2 weeks  
+**Dependencies**: Phase 2 complete
 
-- Objectives
-  - Ensure the Capability Registry is the single source of truth for behavior (param names, temperature rules, schema support, seed, streaming, prompt caching, pricing fields).
-  - Eliminate all model-name or provider-specific heuristics from parameter mapping and routing; use capabilities only.
-  - Document and test capability-driven policies across all shipped models.
+#### Tasks Completed
+- [x] Adapter audit and cleanup (OpenAI/Anthropic/xAI)
+- [x] Logging standard applied across adapters (structured ProviderLogger)
+- [x] Unified error mapping to ProviderError with retry classification
+- [x] Streaming consistency via StreamAdapter (normalized deltas; single usage emission)
+- [x] Conformance tests per adapter (generate, stream, stream_with_usage)
 
-- Scope
-  - OpenAI models: `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `gpt-4o`, `gpt-4o-mini`, `o4-mini` (and versioned aliases used in tests).
-  - Anthropic: active test models (e.g., `claude-3-haiku*`, `claude-3-5-haiku*`).
-  - xAI: current adapter targets.
-  - Pricing fields alignment (input/output/cached input per 1K tokens) for cost calc.
+#### Acceptance Criteria
+- [x] No cross-provider logic in adapters; policy/normalization lives in core
+- [x] Structured logs include provider/model/request_id consistently
+- [x] ProviderError mapping consistent and covered by tests
+- [x] Conformance tests pass for OpenAI, Anthropic, xAI
 
-- Out of scope
-  - Adding new providers or non-tested model families (tracked in backlog).
-  - Changing public API.
-
-- Deliverables
-  - Completed capability entries for all shipped models (flags + pricing consistency).
-  - `core/capabilities/policy.py` helper(s):
-    - `map_max_tokens_field(capabilities, provider) -> {max_tokens|max_completion_tokens|max_output_tokens}`
-    - `apply_temperature_policy(params, capabilities) -> temperature|omit`
-    - `should_use_responses_api(params, capabilities) -> bool` (if not already sufficient)
-  - Removal of residual name checks in normalization (e.g., `"gpt-5-mini" in model_id.lower()`).
-  - Tests: unit coverage per model for mapping; smoke spot-checks.
-  - Docs: capability table excerpt + guidance (architecture-plan.md link).
-
-- Work Breakdown
-  1) Inventory & audit (Day 1)
-     - Enumerate `MODEL_CONFIGS` and map to capabilities; list gaps/inconsistencies.
-     - Verify token parameter naming per model family (`uses_max_completion_tokens`, Responses API `max_output_tokens`).
-     - Verify temperature support and any fixed/required temperatures.
-     - Verify `supports_json_schema`, `supports_seed`, `supports_prompt_caching`.
-  2) Implement policy helpers (Day 2)
-     - Add `core/capabilities/policy.py` with helpers noted above.
-     - Refactor `core/normalization/params.py` to use helpers instead of name checks.
-  3) Provider integration (Day 3)
-     - Ensure OpenAI/Anthropic/xAI adapters consume normalized params without local name heuristics.
-     - Keep Responses API path selection strictly capability-driven.
-  4) Pricing alignment (Day 3)
-     - Confirm input/output/cached pricing in configs for cost calc.
-  5) Tests (Day 4)
-     - Unit tests: parameter mapping per model; temperature omission/clamp; seeds conditional.
-     - Ensure JSON schema path uses `text.format` and enforces `additionalProperties=false`.
-  6) Docs (Day 4)
-     - Add capability notes to `architecture-plan.md` and update examples where helpful.
-
-- Acceptance Criteria
-  - Zero model-name heuristics in normalization/adapters; capabilities-only mapping.
-  - All capability flags accurate for shipped models; tests encode expectations.
-  - Cost calculations use consistent pricing fields; cache savings computed where applicable.
-  - All tests green.
-
-- Risks & Mitigations
-  - Provider SDK drift → mitigate with capability gates and unit tests.
-  - Versioned model IDs → normalize to base IDs in capability lookup.
-  - Mock gaps → harden adapters with getattr/try/except as already established.
-
-- Owners & Timeline
-  - Owner: SDK Core
-  - Duration: ~4 days as outlined (can parallelize audit/tests while adding policy helpers).
-
-### Phase 3: Provider Adapter Clean Split 🔴
-**Status**: NOT STARTED  
-**Target**: 1-2 weeks
-**Dependencies**: Phase 1.1, Phase 2
-
-#### Tasks:
-- [ ] 3.1 Isolate Provider Logic (ensure adapters don’t perform cross-provider logic; centralize to normalization/policy)
-- [ ] 3.2 Logging Standardization (structured logging; provider tag; debug vs info policy)
-- [ ] 3.3 Error Handling Consistency (typed ProviderError mapping; retryable classification)
+#### Risks & Mitigations
+- Upstream SDK changes → minimize per-adapter logic; rely on core helpers; cover with unit tests
+- Streaming event variance → encapsulate normalization in `StreamAdapter`; finalize usage in router when needed
 
 ### Phase 4: Streaming & Events 🔴
 **Status**: NOT STARTED
@@ -293,110 +243,50 @@ steer_llm_sdk/
 | Performance regression | Medium | Benchmarking before/after |
 | Complexity increase | Low | Clear documentation, examples |
 
-## Change Log
+#### Work Completed in Phase 3 (Day 1-4):
+- ✅ Created structured logging utility in `observability/logging.py`
+  - Tracks requests with unique IDs
+  - Logs usage metrics
+  - Provides performance tracking
+- ✅ Created error mapping utilities in `providers/errors.py`
+  - Maps provider-specific errors to standardized ProviderError
+  - Determines retryable errors
+  - Extracts retry-after headers
+- ✅ Enhanced ProviderError class with retryable flags
+- ✅ Updated RetryManager with provider-aware retry logic
+- ✅ Cleaned up all three provider adapters:
+  - Removed hardcoded prompt caching logic (now uses capability-based policy helpers)
+  - Removed cost calculation logic (belongs in router/core)
+  - Added structured logging with request tracking
+  - Updated error handling to use ErrorMapper
+  - Fixed parameter normalization usage
+- ✅ All adapters now properly use:
+  - `get_cache_control_config()` for prompt caching decisions
+  - `normalize_params()` for parameter mapping
+  - `normalize_usage()` for usage standardization
+  - Structured logging with ProviderLogger
+- ✅ Enhanced StreamAdapter with provider-specific normalization (Day 3):
+  - Added provider-specific delta normalization methods
+  - Added usage extraction and aggregation support
+  - Added streaming metrics tracking (chunks, duration, chars/sec)
+  - Created StreamDelta.get_text() method for easy text extraction
+- ✅ Created StreamingHelper for common patterns:
+  - `collect_with_usage()` for collecting all chunks with metrics
+  - `stream_with_events()` for streaming with EventManager integration
+- ✅ Added typed event classes for EventManager:
+  - StreamStartEvent, StreamDeltaEvent, StreamUsageEvent, StreamCompleteEvent
+- ✅ Updated all provider adapters to use enhanced StreamAdapter:
+  - OpenAI, Anthropic, and xAI all use StreamAdapter for normalization
+  - Removed duplicate streaming logic from providers
+  - Added streaming metrics logging to all providers
+- ✅ Created streaming conformance tests in `tests/conformance/test_streaming_conformance.py`
+- ✅ Created comprehensive conformance test suite (Day 4):
+  - `test_generation_conformance.py` - Tests generate() method consistency
+  - `test_error_conformance.py` - Tests error handling and retry classification
+  - `test_parameter_conformance.py` - Tests parameter normalization and mapping
+  - `test_usage_conformance.py` - Tests usage data normalization
+  - Enhanced streaming tests with edge cases (empty streams, interruptions, long streams)
+  - Created shared fixtures in `conftest.py` for all conformance tests
 
-### 2025-08-13
-- Created phase tracker document
-- Started Phase 1 implementation  
-- Set up agent-architecture branch
-- **CRITICAL**: Identified need for directory restructuring
-- Added Phase 0.5 for restructuring (blocks all other work)
-- Updated Phase 1 status to BLOCKED
-- Created RESTRUCTURING_PLAN.md with detailed migration strategy
-- **Progress Update (PM)**:
-  - ✅ Completed provider restructuring (0.5.3)
-    - Moved all providers to new `providers/` structure
-    - Created migration script `migrate_providers.sh`
-    - Updated all imports successfully
-  - ✅ Completed main.py compatibility shim (0.5.5)
-    - Moved `SteerLLMClient` to `api/client.py`
-    - Created deprecation warnings
-    - Verified backward compatibility
-  - Phase 0.5 now at 40% completion
 
-### 2025-08-14
-- Completed Phase 0.5 directory restructuring
-- Moved core normalization/capabilities/routing into `core/`
-- Created `streaming/` and `reliability/` layers with new modules
-- Isolated providers under top-level `providers/`
-- Added `observability/` with metrics and sinks
-- Updated import paths and shims; all tests green
-- Documentation updated and migration notes added
-  - Removed legacy shims: `steer_llm_sdk/main.py`, `steer_llm_sdk/LLMConstants.py`, `steer_llm_sdk/llm/*`
-
-### 2025-08-14
-- Completed Phase 1: Contracts & Normalization
-- ✅ All providers now inherit from ProviderAdapter base class
-- ✅ Integrated normalize_params() and normalize_usage() into all providers
-- ✅ Resolved duplicate ProviderCapabilities definitions
-- ✅ Fixed OpenAI Responses API parameter handling
-- ✅ Created helper method _build_responses_api_payload() for consistent API calls
-- ✅ Fixed transform_messages_for_provider to use "input" instead of "messages" for Responses API
-- ✅ Updated test mocks to provide proper usage data structures
-- ✅ All unit tests passing (20/20)
-- ✅ All smoke tests passing (8/8)
-- Phase 1 now at 100% completion
-
-### 2025-08-14
-- Started Phase 2: Capability Registry Hardening
-- ✅ Day 1 tasks completed:
-  - Added `supports_temperature` flag to ProviderCapabilities
-  - Added `uses_max_output_tokens_in_responses_api` flag for Responses API
-  - Added flagship models (gpt-4o, gpt-4.1, gpt-5, gpt-5-nano) to MODEL_CAPABILITIES
-  - Verified all capability flags are accurate
-  - Verified pricing alignment across models
-  - Identified hardcoded checks to remove in params.py
-- Phase 2 now at 30% completion
-
-### 2025-08-15
-- Completed Phase 2: Capability Registry Hardening
-- ✅ Created policy helpers in `core/capabilities/policy.py`:
-  - `map_max_tokens_field()` - Capability-driven parameter mapping
-  - `apply_temperature_policy()` - Temperature handling based on capabilities
-  - `format_responses_api_schema()` - Proper schema formatting for Responses API
-  - `should_use_responses_api()` - Capability-based API selection
-  - `get_deterministic_settings()` - Deterministic mode parameters
-  - `supports_prompt_caching()` and `get_cache_control_config()` - Caching helpers
-- ✅ Removed all hardcoded model name checks from `params.py`
-- ✅ Updated normalization to use policy helpers
-- ✅ Updated OpenAI adapter to use `format_responses_api_schema()`
-- ✅ Added versioned model aliases for compatibility
-- ✅ Created comprehensive test suite (20 tests) for policy helpers
-- ✅ Created capability reference documentation
-- Phase 2 now at 100% completion
-
-## Current Status Summary
-
-**Current Focus**: Phase 3 (Provider Adapter Clean Split) ready to begin
-
-### Phase 1 Achievements:
-1. Clean provider abstraction with ProviderAdapter interface
-2. Consistent parameter normalization across all providers
-3. Standardized usage reporting format
-4. Improved Responses API support
-5. Capability-driven behavior throughout
-
-### Phase 2 Achievements:
-1. All models have complete capability definitions
-2. Policy helpers enforce capability-driven behavior
-3. No hardcoded model name checks remain
-4. Comprehensive test coverage for capabilities
-5. Clear documentation for adding new models
-
-### Next Immediate Steps:
-1. Begin Phase 3: Provider Adapter Clean Split
-2. Isolate provider-specific logic
-3. Standardize logging across providers
-4. Ensure consistent error handling
-
-### Work Completed in Phase 1:
-- ✅ ProviderAdapter base class in `providers/base.py`
-- ✅ Usage normalization in `core/normalization/usage.py`
-- ✅ Parameter normalization in `core/normalization/params.py`
-- ✅ Updated GenerationParams in `models/generation.py`
-- ✅ All providers updated and tested
-
----
-
-Last Updated: 2025-08-15
-Next Review: After Phase 2 Day 2
+  Change log moved to: docs/architecture/projects/layered-modular/change-log.md

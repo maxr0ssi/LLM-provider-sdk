@@ -126,14 +126,14 @@ def normalize_usage(
     if cache_info is not None:
         normalized["cache_info"] = cache_info
         
-    # Ensure total_tokens is accurate
-    if normalized["total_tokens"] == 0:
-        normalized["total_tokens"] = normalized["prompt_tokens"] + normalized["completion_tokens"]
-    
-    # Ensure all values are integers
+    # Ensure all values are integers first
     normalized["prompt_tokens"] = int(normalized["prompt_tokens"])
     normalized["completion_tokens"] = int(normalized["completion_tokens"])
     normalized["total_tokens"] = int(normalized["total_tokens"])
+    
+    # Ensure total_tokens is accurate (after conversion to int)
+    if normalized["total_tokens"] == 0:
+        normalized["total_tokens"] = normalized["prompt_tokens"] + normalized["completion_tokens"]
     
     return normalized
 

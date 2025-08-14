@@ -8,14 +8,26 @@ This layer handles:
 """
 
 from .adapter import StreamAdapter
-from .manager import EventManager
+from .helpers import StreamingHelper
+from .manager import (
+    EventManager,
+    StreamStartEvent,
+    StreamDeltaEvent, 
+    StreamUsageEvent,
+    StreamCompleteEvent
+)
 from .types import StreamDelta, DeltaType
 
 __all__ = [
     "StreamAdapter",
+    "StreamingHelper",
     "EventManager", 
     "StreamDelta",
-    "DeltaType"
+    "DeltaType",
+    "StreamStartEvent",
+    "StreamDeltaEvent",
+    "StreamUsageEvent", 
+    "StreamCompleteEvent"
 ]
 
 

@@ -103,6 +103,28 @@ class SteerLLMClient:
                 # Just a chunk
                 response_wrapper.add_chunk(item)
         
+        # Post-process JSON-object streaming to avoid duplicate objects when providers
+        # emit full objects alongside deltas. If response_format requests a JSON object,
+        # collapse to the last complete JSON object in the concatenated text.
+        try:
+            rf = params.get("response_format") if isinstance(params, dict) else None
+            if isinstance(rf, dict) and rf.get("type") == "json_object":
+                combined = response_wrapper.get_text()
+                # Find the last complete JSON object heuristically
+                start = combined.rfind("{")
+                end = combined.rfind("}")
+                if start != -1 and end != -1 and end > start:
+                    candidate = combined[start:end+1]
+                    import json  # Local import to avoid overhead when not needed
+                    try:
+                        json.loads(candidate)
+                        # Replace chunks with just the single JSON object
+                        response_wrapper.chunks = [candidate]
+                    except Exception as e:
+                        raise Exception(f"Failed to post-process JSON-object streaming: {e}")
+        except Exception as e:
+            raise Exception(f"Failed to post-process JSON-object streaming: {e}")
+
         return response_wrapper
     
     async def stream(

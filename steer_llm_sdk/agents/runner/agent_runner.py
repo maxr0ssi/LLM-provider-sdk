@@ -24,7 +24,7 @@ from ...reliability.budget import clamp_params_to_budget
 class AgentRunner:
     def __init__(self, metrics_sink: MetricsSink | None = None) -> None:
         self.router = LLMRouter()
-        self.adapter = StreamAdapter()
+        self.adapter = StreamAdapter("generic")
         self.idempotency = IdempotencyManager()
         self.metrics_sink = metrics_sink
 

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Optional
+from dataclasses import dataclass
+from typing import Any, Awaitable, Callable, Dict, Optional
+
+from .types import StreamDelta
 
 
 class EventManager:
@@ -38,4 +41,38 @@ class EventManager:
         if self.on_error:
             await self.on_error(error)
 
+
+# Typed Event Classes for structured event data
+
+@dataclass
+class StreamStartEvent:
+    """Event emitted when streaming starts."""
+    provider: str
+    model: str
+    request_id: str
+
+
+@dataclass
+class StreamDeltaEvent:
+    """Event emitted for each streaming delta."""
+    delta: StreamDelta
+    chunk_index: int
+
+
+@dataclass
+class StreamUsageEvent:
+    """Event emitted when usage data is available."""
+    usage: Dict[str, Any]
+    provider: str
+    model: str
+
+
+@dataclass
+class StreamCompleteEvent:
+    """Event emitted when streaming completes."""
+    total_chunks: int
+    duration_seconds: float
+    final_text: str
+    provider: str
+    model: str
 

@@ -170,6 +170,8 @@ class ProviderError(Exception):
         provider: Provider name
         status_code: HTTP status code if applicable
         retry_after: Seconds to wait before retry if applicable
+        is_retryable: Whether this error should be retried
+        original_error: The original exception if wrapped
     """
     
     def __init__(
@@ -183,3 +185,5 @@ class ProviderError(Exception):
         self.provider = provider
         self.status_code = status_code
         self.retry_after = retry_after
+        self.is_retryable = False  # Default, should be set by error mapper
+        self.original_error = None  # Will be set by error mapper if wrapping

@@ -12,7 +12,8 @@ from ..capabilities.models import ProviderCapabilities, get_model_capabilities
 from ..capabilities.policy import (
     map_max_tokens_field,
     apply_temperature_policy,
-    should_use_responses_api as policy_should_use_responses_api
+    should_use_responses_api as policy_should_use_responses_api,
+    get_deterministic_settings
 )
 from ...models.generation import GenerationParams
 
@@ -121,6 +122,12 @@ def normalize_params(
                 normalized["responses_use_instructions"] = metadata["responses_use_instructions"]
             if metadata.get("reasoning") is not None:
                 normalized["reasoning"] = metadata["reasoning"]
+    
+    # Apply deterministic settings if requested
+    if hasattr(params, "deterministic") and params.deterministic:
+        deterministic_settings = get_deterministic_settings(capabilities, True)
+        # Override temperature and top_p with deterministic values
+        normalized.update(deterministic_settings)
     
     return normalized
 
