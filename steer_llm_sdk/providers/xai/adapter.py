@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Any, AsyncGenerator, Optional, List, Union
+from typing import Dict, Any, AsyncGenerator, Optional, List, Tuple, Union
 import logging
 from dotenv import load_dotenv
 import xai_sdk
@@ -9,14 +9,18 @@ from xai_sdk import AsyncClient
 load_dotenv()
 from xai_sdk.chat import system, user, assistant
 
+from ..base import ProviderAdapter, ProviderError
 from ...models.generation import GenerationParams, GenerationResponse
 from ...models.conversation_types import ConversationMessage
+from ...core.capabilities import get_capabilities_for_model
+from ...core.normalization.params import normalize_params
+from ...core.normalization.usage import normalize_usage
 
 
 logger = logging.getLogger(__name__)
 
 
-class XAIProvider:
+class XAIProvider(ProviderAdapter):
     """xAI API provider with conversation support, using xai_sdk.AsyncClient"""
     
     def __init__(self):
@@ -38,42 +42,50 @@ class XAIProvider:
         params: GenerationParams
     ) -> GenerationResponse:
         """Generate text using xAI API with conversation support."""
-        # Format messages for xAI chat
-        if isinstance(messages, str):
-            formatted = [user(messages)]
-        else:
-            formatted = []
-            for msg in messages:
-                if msg.role == "system":
-                    formatted.append(system(msg.content))
-                elif msg.role == "user":
-                    formatted.append(user(msg.content))
-                elif msg.role == "assistant":
-                    formatted.append(assistant(msg.content))
-        
-        # Create chat and sample response
-        chat = await self.client.chat.create(
-            model=params.model,
-            messages=formatted,
-            max_tokens=params.max_tokens,
-            temperature=params.temperature,
-            top_p=params.top_p,
-            frequency_penalty=params.frequency_penalty,
-            presence_penalty=params.presence_penalty,
-            stop=params.stop
-        )
-        response = await chat.sample()
-        
-        # Note: xai_sdk does not expose usage by default; return empty for tests expecting {}
-        usage: Dict[str, int] = {}
-        
-        return GenerationResponse(
-            text=response.content,
-            model=params.model,
-            usage=usage,
-            provider="xai",
-            finish_reason=getattr(response, "finish_reason", None)
-        )
+        try:
+            # Format messages for xAI chat
+            if isinstance(messages, str):
+                formatted = [user(messages)]
+            else:
+                formatted = []
+                for msg in messages:
+                    if msg.role == "system":
+                        formatted.append(system(msg.content))
+                    elif msg.role == "user":
+                        formatted.append(user(msg.content))
+                    elif msg.role == "assistant":
+                        formatted.append(assistant(msg.content))
+            
+            # Use normalization function to prepare parameters
+            caps = get_capabilities_for_model(params.model)
+            xai_params = normalize_params(params, params.model, "xai", caps)
+            
+            # Add messages to parameters
+            xai_params["messages"] = formatted
+            
+            # Create chat and sample response
+            chat = await self.client.chat.create(**xai_params)
+            response = await chat.sample()
+            
+            # Extract usage with normalization (xAI may not provide usage data)
+            usage_dict = None
+            if hasattr(response, 'usage'):
+                try:
+                    usage_dict = response.usage if isinstance(response.usage, dict) else {}
+                except Exception:
+                    usage_dict = None
+            
+            usage = normalize_usage(usage_dict, "xai")
+            
+            return GenerationResponse(
+                text=response.content,
+                model=params.model,
+                usage=usage,
+                provider="xai",
+                finish_reason=getattr(response, "finish_reason", None)
+            )
+        except Exception as e:
+            raise ProviderError(f"xAI API error: {str(e)}", "xai")
     
     async def generate_stream(
         self,
@@ -81,32 +93,33 @@ class XAIProvider:
         params: GenerationParams
     ) -> AsyncGenerator[str, None]:
         """Generate text using xAI API with streaming support."""
-        # Format messages for xAI chat
-        if isinstance(messages, str):
-            formatted = [user(messages)]
-        else:
-            formatted = []
-            for msg in messages:
-                if msg.role == "system":
-                    formatted.append(system(msg.content))
-                elif msg.role == "user":
-                    formatted.append(user(msg.content))
-                elif msg.role == "assistant":
-                    formatted.append(assistant(msg.content))
-        
-        # Create chat and stream response
-        chat = await self.client.chat.create(
-            model=params.model,
-            messages=formatted,
-            max_tokens=params.max_tokens,
-            temperature=params.temperature,
-            top_p=params.top_p,
-            frequency_penalty=params.frequency_penalty,
-            presence_penalty=params.presence_penalty,
-            stop=params.stop
-        )
-        async for response, chunk in chat.stream():
-            yield chunk.content
+        try:
+            # Format messages for xAI chat
+            if isinstance(messages, str):
+                formatted = [user(messages)]
+            else:
+                formatted = []
+                for msg in messages:
+                    if msg.role == "system":
+                        formatted.append(system(msg.content))
+                    elif msg.role == "user":
+                        formatted.append(user(msg.content))
+                    elif msg.role == "assistant":
+                        formatted.append(assistant(msg.content))
+            
+            # Use normalization function to prepare parameters
+            caps = get_capabilities_for_model(params.model)
+            xai_params = normalize_params(params, params.model, "xai", caps)
+            
+            # Add messages to parameters
+            xai_params["messages"] = formatted
+            
+            # Create chat and stream response
+            chat = await self.client.chat.create(**xai_params)
+            async for response, chunk in chat.stream():
+                yield chunk.content
+        except Exception as e:
+            raise ProviderError(f"xAI streaming error: {str(e)}", "xai")
     
     async def generate_stream_with_usage(
         self,
@@ -189,7 +202,7 @@ class XAIProvider:
             }
             
             # Calculate cost if available
-            from ..registry import calculate_exact_cost, get_config
+            from ...core.routing import calculate_exact_cost, get_config
             config = get_config(params.model)
             cost_usd = None
             cost_breakdown = None

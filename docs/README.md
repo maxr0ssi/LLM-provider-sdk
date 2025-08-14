@@ -3,6 +3,7 @@
 - Architecture
   - `architecture/projects/layered-modular/` (plans, diagrams, refactoring, trackers)
     - Phase 0.5: Directory restructuring COMPLETE (2025-08-14)
+    - Shims removed: use new layer import paths (see migration.md)
 - Guides
   - `guides/agents-openai-responses.md`
   - `guides/chat-completions.md`

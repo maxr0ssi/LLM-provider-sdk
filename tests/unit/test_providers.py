@@ -185,8 +185,13 @@ class TestXAIProvider:
         
         assert response.text == "Test response"
         assert response.provider == "xai"
-        # xAI doesn't provide usage stats - usage dict is empty
-        assert response.usage == {}
+        # xAI doesn't provide usage stats - normalize_usage returns standard format with zeros
+        assert response.usage == {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cache_info": {}
+        }
     
     @pytest.mark.asyncio
     async def test_generate_conversation(self, provider, mock_xai_client):

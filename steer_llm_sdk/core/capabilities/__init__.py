@@ -7,12 +7,13 @@ This layer handles:
 - Feature availability detection
 """
 
-from .loader import get_capabilities_for_model, ProviderCapabilities
-from .models import ProviderCapabilities as ProviderCapabilitiesModel, get_model_capabilities
+from .loader import get_capabilities_for_model
+from .models import ProviderCapabilities, get_model_capabilities, DEFAULT_CAPABILITIES, MODEL_CAPABILITIES
 
 __all__ = [
     "get_capabilities_for_model", 
+    "get_model_capabilities",
     "ProviderCapabilities",
-    "ProviderCapabilitiesModel",
-    "get_model_capabilities"
+    "DEFAULT_CAPABILITIES",
+    "MODEL_CAPABILITIES"
 ]

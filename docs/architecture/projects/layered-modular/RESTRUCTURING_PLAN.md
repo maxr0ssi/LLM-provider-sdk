@@ -160,11 +160,11 @@ from steer_llm_sdk.providers.base import ProviderAdapter
 from steer_llm_sdk.streaming import StreamAdapter
 ```
 
-### Backward Compatibility Strategy
-1. Keep `main.py` as a compatibility shim that imports from `api/client.py`
-2. Add deprecation warnings for old import paths
-3. Maintain old imports for 2-3 versions
-4. Document migration path for users
+### Backward Compatibility Status (Post 0.5)
+1. Legacy shims removed in 0.3.0 development cycle to reduce surface area
+2. Old import paths are no longer supported; documented migration in `migration.md`
+3. Public API remains stable (`SteerLLMClient`, generate/stream split preserved)
+4. For any downstreams, update imports to the new layer paths
 
 ### Files to Move (Examples)
 

@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Any, AsyncGenerator, Optional, List, Union
+from typing import Dict, Any, AsyncGenerator, Optional, List, Tuple, Union
 import logging
 from dotenv import load_dotenv
 import anthropic
@@ -8,14 +8,18 @@ from anthropic import AsyncAnthropic
 # Load environment variables
 load_dotenv()
 
+from ..base import ProviderAdapter, ProviderError
 from ...models.generation import GenerationParams, GenerationResponse
 from ...models.conversation_types import ConversationMessage
+from ...core.capabilities import get_capabilities_for_model
+from ...core.normalization.params import normalize_params, transform_messages_for_provider
+from ...core.normalization.usage import normalize_usage
 
 
 logger = logging.getLogger(__name__)
 
 
-class AnthropicProvider:
+class AnthropicProvider(ProviderAdapter):
     """Anthropic Claude API provider with conversation support."""
     
     def __init__(self):
@@ -58,32 +62,37 @@ class AnthropicProvider:
                             "content": msg.content
                         })
             
-            # Prepare Anthropic-specific parameters
-            anthropic_params = {
-                "model": params.model,
-                "messages": formatted_messages,
-                "max_tokens": params.max_tokens,
-                "temperature": params.temperature,
-                "top_p": params.top_p,
-            }
+            # Use normalization function to prepare parameters
+            caps = get_capabilities_for_model(params.model)
+            anthropic_params = normalize_params(params, params.model, "anthropic", caps)
             
-            # Add system message as top-level parameter if present
-            if system_message:
-                # Enable prompt caching for long system messages (like Anthropic's guide)
-                if len(system_message) > 1024:  # Only cache long system prompts
-                    anthropic_params["system"] = [
-                        {
-                            "type": "text", 
-                            "text": system_message,
-                            "cache_control": {"type": "ephemeral"}
-                        }
-                    ]
-                    logger.debug("Anthropic: caching system prompt (%s chars)", len(system_message))
-                else:
-                    anthropic_params["system"] = system_message
-            
-            if params.stop:
-                anthropic_params["stop_sequences"] = params.stop
+            # Transform messages for Anthropic format (system message separate)
+            all_messages = [{"role": "system", "content": system_message}] if system_message else []
+            all_messages.extend(formatted_messages)
+            transformed = transform_messages_for_provider(all_messages, "anthropic")
+
+            # Add messages to parameters
+            if isinstance(transformed, dict):
+                anthropic_params.update(transformed)
+
+                # Drop system if None to avoid SDK type validation error
+                if anthropic_params.get("system") is None:
+                    anthropic_params.pop("system", None)
+
+                # Enable prompt caching for long system messages
+                if "system" in anthropic_params and isinstance(anthropic_params["system"], str):
+                    system_text = anthropic_params["system"]
+                    if len(system_text) > 1024:
+                        anthropic_params["system"] = [
+                            {
+                                "type": "text",
+                                "text": system_text,
+                                "cache_control": {"type": "ephemeral"}
+                            }
+                        ]
+                        logger.debug("Anthropic: caching system prompt (%s chars)", len(system_text))
+            else:
+                anthropic_params["messages"] = transformed
             
             # Make API call
             response = await self.client.messages.create(**anthropic_params)
@@ -94,41 +103,15 @@ class AnthropicProvider:
                 if content_block.type == "text":
                     text_content += content_block.text
             
-            # Check for cache headers/indicators (Anthropic explicit caching)
-            cache_info = {}
+            # Extract usage with normalization
+            usage_dict = None
             if hasattr(response, 'usage'):
-                usage_dict = response.usage.model_dump() if hasattr(response.usage, 'model_dump') else response.usage.__dict__
-                
-                # Check for cache creation (first time caching)
-                if hasattr(response.usage, 'cache_creation_input_tokens'):
-                    try:
-                        cache_creation = int(getattr(response.usage, 'cache_creation_input_tokens') or 0)
-                    except Exception:
-                        cache_creation = 0
-                    cache_info["cache_creation_input_tokens"] = cache_creation
-                    if isinstance(cache_creation, int) and cache_creation > 0:
-                        print(f"💾 Anthropic Cache CREATION: {cache_creation} tokens cached for future use")
-                
-                # Check for cache read (cache hit)
-                if hasattr(response.usage, 'cache_read_input_tokens'):
-                    try:
-                        cache_read = int(getattr(response.usage, 'cache_read_input_tokens') or 0)
-                    except Exception:
-                        cache_read = 0
-                    cache_info["cache_read_input_tokens"] = cache_read
-                    if isinstance(cache_read, int) and cache_read > 0:
-                        print(f"🎯 Anthropic Cache HIT: {cache_read} tokens read from cache")
-                        print(f"   💰 Cost savings: ~{(cache_read / 1000) * 0.003:.6f} USD saved")
-                
-                # Log usage for debugging
-                logger.debug("Anthropic usage: %s", usage_dict)
+                try:
+                    usage_dict = response.usage.model_dump() if hasattr(response.usage, 'model_dump') else response.usage.__dict__
+                except Exception:
+                    usage_dict = {}
             
-            usage = {
-                "prompt_tokens": response.usage.input_tokens,
-                "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
-                "cache_info": cache_info
-            }
+            usage = normalize_usage(usage_dict, "anthropic")
             
             return GenerationResponse(
                 text=text_content,
@@ -139,7 +122,7 @@ class AnthropicProvider:
             )
             
         except Exception as e:
-            raise Exception(f"Anthropic API error: {str(e)}")
+            raise ProviderError(f"Anthropic API error: {str(e)}", "anthropic")
     
     async def generate_stream(self, 
                             messages: Union[str, List[ConversationMessage]], 
@@ -163,15 +146,10 @@ class AnthropicProvider:
                             "content": msg.content
                         })
             
-            # Prepare Anthropic-specific parameters
-            anthropic_params = {
-                "model": params.model,
-                "messages": formatted_messages,
-                "max_tokens": params.max_tokens,
-                "temperature": params.temperature,
-                "top_p": params.top_p,
-                "stream": True
-            }
+            # Use normalization function to prepare parameters
+            caps = get_capabilities_for_model(params.model)
+            anthropic_params = normalize_params(params, params.model, "anthropic", caps)
+            anthropic_params["stream"] = True
 
             # Compose prompt text for fallback usage estimation when provider omits tokens
             try:
@@ -186,39 +164,20 @@ class AnthropicProvider:
             except Exception:
                 prompt_text_estimate = ""
             
-            # Add system message as top-level parameter if present
-            if system_message:
-                anthropic_params["system"] = system_message
-            
-            if params.stop:
-                anthropic_params["stop_sequences"] = params.stop
-            
-            # Compose prompt text estimate for fallback usage calculation
-            try:
-                prompt_text_estimate = []
-                if system_message:
-                    prompt_text_estimate.append(system_message)
-                for m in formatted_messages:
-                    content = m.get("content")
-                    if isinstance(content, str):
-                        prompt_text_estimate.append(content)
-                prompt_text_estimate = " ".join(prompt_text_estimate)
-            except Exception:
-                prompt_text_estimate = ""
+            # Transform messages for Anthropic format
+            all_messages = [{"role": "system", "content": system_message}] if system_message else []
+            all_messages.extend(formatted_messages)
+            transformed = transform_messages_for_provider(all_messages, "anthropic")
 
-            # Compose prompt text estimate for fallback usage calculation
-            try:
-                prompt_text_estimate = []
-                if system_message:
-                    prompt_text_estimate.append(system_message)
-                for m in formatted_messages:
-                    content = m.get("content")
-                    if isinstance(content, str):
-                        prompt_text_estimate.append(content)
-                prompt_text_estimate = " ".join(prompt_text_estimate)
-            except Exception:
-                prompt_text_estimate = ""
-
+            # Add messages to parameters
+            if isinstance(transformed, dict):
+                anthropic_params.update(transformed)
+                # Drop system if None to satisfy SDK
+                if anthropic_params.get("system") is None:
+                    anthropic_params.pop("system", None)
+            else:
+                anthropic_params["messages"] = transformed
+            
             # Compose prompt text estimate for fallback usage calculation
             try:
                 prompt_text_estimate = []
@@ -241,7 +200,7 @@ class AnthropicProvider:
                         yield event.delta.text
                         
         except Exception as e:
-            raise Exception(f"Anthropic streaming error: {str(e)}")
+            raise ProviderError(f"Anthropic streaming error: {str(e)}", "anthropic")
     
     async def generate_stream_with_usage(self, 
                                        messages: Union[str, List[ConversationMessage]], 
@@ -279,23 +238,31 @@ class AnthropicProvider:
                             "content": content
                         })
             
-            # Prepare Anthropic-specific parameters
-            anthropic_params = {
-                "model": params.model,
-                "messages": formatted_messages,
-                "max_tokens": params.max_tokens,
-                "temperature": params.temperature,
-                "top_p": params.top_p,
-                "stream": True
-            }
+            # Use normalization function to prepare parameters
+            caps = get_capabilities_for_model(params.model)
+            anthropic_params = normalize_params(params, params.model, "anthropic", caps)
+            anthropic_params["stream"] = True
             
-            # Add system message as top-level parameter if present
+            # Transform messages for Anthropic format (ensure messages field is present)
+            all_messages = [{"role": "system", "content": system_message}] if system_message else []
+            all_messages.extend(formatted_messages)
+            transformed = transform_messages_for_provider(all_messages, "anthropic")
+
+            if isinstance(transformed, dict):
+                anthropic_params.update(transformed)
+                # Drop system if None to satisfy SDK validators
+                if anthropic_params.get("system") is None:
+                    anthropic_params.pop("system", None)
+            else:
+                anthropic_params["messages"] = transformed
+
+            # Add system message as top-level parameter if present (and not already structured)
             if system_message:
                 # Enable prompt caching for long system messages (like Anthropic's guide)
                 if len(system_message) > 1024:  # Only cache long system prompts
                     anthropic_params["system"] = [
                         {
-                            "type": "text", 
+                            "type": "text",
                             "text": system_message,
                             "cache_control": {"type": "ephemeral"}
                         }
@@ -418,7 +385,7 @@ class AnthropicProvider:
                         })
                     
         except Exception as e:
-            raise Exception(f"Anthropic streaming error: {str(e)}")
+            raise ProviderError(f"Anthropic streaming error: {str(e)}", "anthropic")
     
     def is_available(self) -> bool:
         """Check if Anthropic API is available."""

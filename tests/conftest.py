@@ -100,7 +100,17 @@ def mock_openai_client():
     # Mock chat completions
     completion = Mock()
     completion.choices = [Mock(message=Mock(content="Test response"), finish_reason="stop")]
-    completion.usage = Mock(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+    # Make usage a proper object with model_dump method
+    usage_mock = Mock()
+    usage_mock.prompt_tokens = 10
+    usage_mock.completion_tokens = 5
+    usage_mock.total_tokens = 15
+    usage_mock.model_dump.return_value = {
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+        "total_tokens": 15
+    }
+    completion.usage = usage_mock
     completion.model = "gpt-4o-mini"
     
     client.chat.completions.create = AsyncMock(return_value=completion)
@@ -129,7 +139,15 @@ def mock_anthropic_client():
     message = Mock()
     message.content = [Mock(type="text", text="Test response")]
     message.stop_reason = "end_turn"
-    message.usage = Mock(input_tokens=10, output_tokens=5)
+    # Make usage a proper object with model_dump method
+    usage_mock = Mock()
+    usage_mock.input_tokens = 10
+    usage_mock.output_tokens = 5
+    usage_mock.model_dump.return_value = {
+        "input_tokens": 10,
+        "output_tokens": 5
+    }
+    message.usage = usage_mock
     
     client.messages.create = AsyncMock(return_value=message)
     

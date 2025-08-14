@@ -5,7 +5,7 @@ All notable changes to the Steer LLM SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] - 2025-08-13 (still in pogress)
+ ## [0.3.0] - 2025-08-13 (in progress)
 ### Changed
 - Completed Phase 0.5 directory restructuring (2025-08-14)
   - Introduced new layered structure: `api/`, `core/`, `providers/`, `streaming/`, `reliability/`, `observability/`, `integrations/`
@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added streaming and reliability layers and modules
   - Maintained backward compatibility via shims (`main.py`)
   - Updated documentation and migration notes
+  - Removed legacy shims in follow-up commit (0.3.0 cycle):
+    - `steer_llm_sdk/main.py` re-export removed; use `steer_llm_sdk.api.client`
+    - `steer_llm_sdk/LLMConstants.py` removed; use `steer_llm_sdk.config.constants`
+    - legacy `steer_llm_sdk/llm/*` shims removed; use new layer paths
 
 ## [0.2.1] - 2025-08-13
 ### Fixed

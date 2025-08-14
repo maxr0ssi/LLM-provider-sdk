@@ -8,7 +8,7 @@ without hardcoded model name checks.
 
 from typing import Any, Dict, Optional
 
-from ...agents.models.capabilities import ProviderCapabilities, get_model_capabilities
+from ..capabilities.models import ProviderCapabilities, get_model_capabilities
 from ...models.generation import GenerationParams
 
 
@@ -183,7 +183,7 @@ def transform_messages_for_provider(
             # For Responses API with instructions mapping
             return {
                 "instructions": messages[0]["content"],
-                "messages": messages[1:]
+                "input": messages[1:]  # Responses API uses "input", not "messages"
             }
         else:
             # Standard format
