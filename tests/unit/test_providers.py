@@ -4,9 +4,9 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 import os
 
-from steer_llm_sdk.llm.providers.openai import OpenAIProvider
-from steer_llm_sdk.llm.providers.anthropic import AnthropicProvider
-from steer_llm_sdk.llm.providers.xai import XAIProvider
+from steer_llm_sdk.providers.openai.adapter import OpenAIProvider
+from steer_llm_sdk.providers.anthropic.adapter import AnthropicProvider
+from steer_llm_sdk.providers.xai.adapter import XAIProvider
 from steer_llm_sdk.models.generation import GenerationParams
 from steer_llm_sdk.models.conversation_types import ConversationMessage, TurnRole as ConversationRole
 

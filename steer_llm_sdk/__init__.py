@@ -16,9 +16,9 @@ Features:
 
 __version__ = "0.2.1"
 
-from .llm.router import LLMRouter, llm_router
-from .main import SteerLLMClient, generate
-from .llm.registry import (
+from .core.routing import LLMRouter, router as llm_router
+from .api.client import SteerLLMClient, generate
+from .core.routing import (
     get_config,
     get_available_models,
     is_model_available,

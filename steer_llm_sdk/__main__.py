@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Load environment variables on import
 load_dotenv()
 
-from .main import main
+from .cli import main
 
 if __name__ == "__main__":
     main()

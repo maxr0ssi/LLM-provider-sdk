@@ -3,6 +3,104 @@
 A unified Python SDK for integrating multiple Large Language Model (LLM) providers (OpenAI, Anthropic, xAI) with a consistent interface, intelligent routing, and comprehensive model management.
 
 ## Overview
+### Streaming API (Updated)
+
+We have split the streaming API to provide a clean, scalable contract:
+
+- `SteerLLMClient.stream(...)` is a pure async generator that yields text chunks. It no longer accepts `return_usage`.
+- `SteerLLMClient.stream_with_usage(...)` is an awaitable that returns a wrapper with full text and usage metadata after streaming completes.
+- `SteerLLMClient.generate(...)` returns a `GenerationResponse` object.
+- Convenience function `steer_llm_sdk.api.client.generate(...)` returns just the generated text (`str`).
+
+#### Quick examples
+
+Async generator streaming (preferred for high-throughput):
+
+```python
+from steer_llm_sdk import SteerLLMClient
+
+client = SteerLLMClient()
+async for chunk in client.stream("Hello", model="gpt-4o-mini", max_tokens=64):
+    print(chunk, end="")
+```
+
+Awaitable streaming with usage summary:
+
+```python
+from steer_llm_sdk import SteerLLMClient
+
+client = SteerLLMClient()
+resp = await client.stream_with_usage(
+    messages="Tell a 10-word joke",
+    model="gpt-4o-mini",
+    max_tokens=64,
+)
+
+print(resp.get_text())
+print(resp.usage)  # {prompt_tokens, completion_tokens, total_tokens, cache_info}
+```
+
+Object vs. text responses:
+
+```python
+from steer_llm_sdk import SteerLLMClient
+from steer_llm_sdk.api.client import generate as text_generate
+
+client = SteerLLMClient()
+obj = await client.generate("Hello", model="gpt-4o-mini")  # GenerationResponse
+print(obj.text)
+
+txt = await text_generate("Hello", model="gpt-4o-mini")   # str
+print(txt)
+```
+
+### Migration notes (Return type and streaming split)
+
+If you previously used `stream(..., return_usage=True)`, migrate to `stream_with_usage(...)`.
+
+Before:
+
+```python
+response = await client.stream("Hello", model="gpt-4o-mini", return_usage=True)
+print(response.get_text())
+print(response.usage)
+```
+
+After:
+
+```python
+response = await client.stream_with_usage("Hello", model="gpt-4o-mini")
+print(response.get_text())
+print(response.usage)
+```
+
+If you previously expected `str` from `client.generate(...)`, switch to the convenience function or use `.text`:
+
+Before:
+
+```python
+txt = await client.generate("Hello")  # str
+```
+
+After (Option A – convenience):
+
+```python
+from steer_llm_sdk.api.client import generate
+txt = await generate("Hello")  # str
+```
+
+After (Option B – object):
+
+```python
+obj = await client.generate("Hello")  # GenerationResponse
+txt = obj.text
+```
+
+Deprecation timeline:
+
+- Passing `return_usage` to `stream(...)` is deprecated and will raise in a future minor release.
+- Use `stream_with_usage(...)` immediately for usage summaries.
+
 
 The Steer LLM SDK is the foundational AI integration layer for the Steer ecosystem. It provides:
 

@@ -11,17 +11,47 @@ class ProviderType(str, Enum):
 
 
 class GenerationParams(BaseModel):
-    """Normalized generation parameters for all providers."""
-    model: str
-    max_tokens: int = Field(default=512, ge=1, le=50000)  # Increased limit
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    top_p: float = Field(default=1.0, ge=0.0, le=1.0)
-    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
-    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
-    stop: Optional[List[str]] = None
-    # Additional parameters that providers might use
-    response_format: Optional[Dict[str, Any]] = None
-    seed: Optional[int] = None
+    """
+    Normalized generation parameters for all providers.
+    
+    This model defines the standard parameters that can be used across all providers.
+    Provider adapters use the capability registry to map these parameters to
+    provider-specific formats.
+    """
+    # Core parameters
+    model: str = Field(..., description="Model identifier")
+    max_tokens: int = Field(default=512, ge=1, le=50000, description="Maximum tokens to generate")
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
+    top_p: float = Field(default=1.0, ge=0.0, le=1.0, description="Nucleus sampling parameter")
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Frequency penalty")
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Presence penalty")
+    stop: Optional[List[str]] = Field(None, description="Stop sequences")
+    
+    # Structured output and determinism
+    response_format: Optional[Dict[str, Any]] = Field(None, description="Response format (e.g., JSON schema)")
+    seed: Optional[int] = Field(None, description="Random seed for deterministic generation")
+    
+    # New fields for Responses API and agent support
+    responses_use_instructions: Optional[bool] = Field(
+        None, 
+        description="Map first system message to instructions field (Responses API)"
+    )
+    strict: Optional[bool] = Field(
+        None,
+        description="Enable strict schema adherence (Responses API)"
+    )
+    reasoning: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Reasoning configuration (e.g., effort levels)"
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Additional metadata (trace_id, idempotency_key, etc.)"
+    )
+    
+    # Provider-specific parameters (kept for backward compatibility)
+    top_k: Optional[int] = Field(None, ge=0, description="Top-k sampling (Anthropic)")
+    logprobs: Optional[bool] = Field(None, description="Return log probabilities (OpenAI)")
     
     class Config:
         extra = "allow"  # Allow additional fields to pass through
@@ -52,6 +82,8 @@ class ModelConfig(BaseModel):
     input_cost_per_1k_tokens: Optional[float] = None
     output_cost_per_1k_tokens: Optional[float] = None
     cached_input_cost_per_1k_tokens: Optional[float] = None
+    # Legacy blended pricing support for tests
+    cost_per_1k_tokens: Optional[float] = None
 
 
 class GenerationRequest(BaseModel):

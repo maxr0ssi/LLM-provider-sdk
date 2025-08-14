@@ -9,7 +9,7 @@ setup(
     name="steer-llm-sdk",
     version="0.2.1",
     author="Max Rossi",
-    author_email="maxrossi2002@hotmail.co.uk",
+    author_email="maxrossi@steer-ai.com",
     description="Multi-provider LLM integration SDK with normalization and validation",
     long_description=long_description,
     long_description_content_type="text/markdown",

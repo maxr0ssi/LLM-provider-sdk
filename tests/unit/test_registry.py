@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch, Mock
 import time
 
-from steer_llm_sdk.llm.registry import (
+from steer_llm_sdk.core.routing import (
     get_config,
     get_available_models,
     is_model_available,
@@ -53,7 +53,7 @@ class TestRegistry:
     def test_check_lightweight_availability_openai(self):
         """Test lightweight availability check for OpenAI."""
         # Mock a config with OpenAI provider
-        with patch('steer_llm_sdk.llm.registry.get_config') as mock_get_config:
+        with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config:
             mock_get_config.return_value = ModelConfig(
                 name="test",
                 display_name="Test",
@@ -68,11 +68,11 @@ class TestRegistry:
     def test_check_lightweight_availability_no_api_key(self):
         """Test lightweight availability check without API key."""
         # Clear cache first
-        from steer_llm_sdk.llm.registry import _model_status_cache
+        from steer_llm_sdk.core.routing.selector import _model_status_cache
         _model_status_cache.clear()
         
         with patch.dict('os.environ', {}, clear=True):
-            with patch('steer_llm_sdk.llm.registry.get_config') as mock_get_config:
+            with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config:
                 mock_get_config.return_value = ModelConfig(
                     name="test",
                     display_name="Test", 
@@ -86,7 +86,7 @@ class TestRegistry:
     
     def test_check_lightweight_availability_caching(self):
         """Test that availability results are cached."""
-        with patch('steer_llm_sdk.llm.registry.get_config') as mock_get_config:
+        with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config:
             mock_get_config.return_value = ModelConfig(
                 name="test",
                 display_name="Test",
@@ -97,15 +97,15 @@ class TestRegistry:
             )
             
             # Clear cache
-            from steer_llm_sdk.llm.registry import _model_status_cache
+            from steer_llm_sdk.core.routing.selector import _model_status_cache
             _model_status_cache.clear()
             
             # First call
-            with patch.dict('os.environ', {'OPENAI_API_KEY': 'test-key'}):
+            with patch.dict('os.environ', {'OPENAI_API_KEY': 'test-key', 'STEER_SDK_BYPASS_AVAILABILITY_CHECK': 'false'}):
                 result1 = check_lightweight_availability("test-model")
             
             # Second call should use cache
-            with patch.dict('os.environ', {}, clear=True):
+            with patch.dict('os.environ', {'STEER_SDK_BYPASS_AVAILABILITY_CHECK': 'false'}, clear=True):
                 result2 = check_lightweight_availability("test-model")
             
             # Should return same result due to cache

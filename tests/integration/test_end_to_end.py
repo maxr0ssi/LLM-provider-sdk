@@ -30,8 +30,10 @@ class TestEndToEnd:
             max_tokens=50
         )
         
-        assert isinstance(result, str)
-        assert len(result) > 0
+        from steer_llm_sdk.models.generation import GenerationResponse
+        assert isinstance(result, GenerationResponse)
+        assert isinstance(result.text, str)
+        assert len(result.text) > 0
     
     @pytest.mark.asyncio
     async def test_client_conversation_generation(self, mock_providers):
@@ -55,8 +57,10 @@ class TestEndToEnd:
             temperature=0.7
         )
         
-        assert isinstance(result, str)
-        assert len(result) > 0
+        from steer_llm_sdk.models.generation import GenerationResponse
+        assert isinstance(result, GenerationResponse)
+        assert isinstance(result.text, str)
+        assert len(result.text) > 0
     
     @pytest.mark.asyncio
     async def test_client_streaming(self, mock_providers):
@@ -111,7 +115,7 @@ class TestEndToEnd:
         router = LLMRouter()
         
         # Import to check available models
-        from steer_llm_sdk.llm.registry import MODEL_CONFIGS
+        from steer_llm_sdk.core.routing import MODEL_CONFIGS
         
         # Test OpenAI provider - use actual model that maps to OpenAI
         response = await router.generate(
@@ -145,15 +149,16 @@ class TestEndToEnd:
         original_openai = os.environ.get('OPENAI_API_KEY')
         original_anthropic = os.environ.get('ANTHROPIC_API_KEY')
         original_xai = os.environ.get('XAI_API_KEY')
+        original_bypass = os.environ.get('STEER_SDK_BYPASS_AVAILABILITY_CHECK')
         
         try:
-            # Clear all API keys
-            for key in ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'XAI_API_KEY']:
+            # Clear all API keys and bypass
+            for key in ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'XAI_API_KEY', 'STEER_SDK_BYPASS_AVAILABILITY_CHECK']:
                 if key in os.environ:
                     del os.environ[key]
             
             # Clear the cache to ensure fresh availability check
-            from steer_llm_sdk.llm.registry import _model_status_cache
+            from steer_llm_sdk.core.routing.selector import _model_status_cache
             _model_status_cache.clear()
             
             router = LLMRouter()
@@ -178,6 +183,8 @@ class TestEndToEnd:
                 os.environ['ANTHROPIC_API_KEY'] = original_anthropic
             if original_xai:
                 os.environ['XAI_API_KEY'] = original_xai
+            if original_bypass:
+                os.environ['STEER_SDK_BYPASS_AVAILABILITY_CHECK'] = original_bypass
     
     @pytest.mark.asyncio
     async def test_conversation_flow(self, mock_providers):
@@ -204,7 +211,7 @@ class TestEndToEnd:
         # Add assistant response to conversation
         conversation.append(ConversationMessage(
             role=ConversationRole.ASSISTANT,
-            content=response1
+            content=response1.text
         ))
         
         # Second user message
@@ -216,8 +223,9 @@ class TestEndToEnd:
         # Get second response
         response2 = await client.generate(conversation, model="GPT-4o Mini")
         
-        assert isinstance(response1, str)
-        assert isinstance(response2, str)
+        from steer_llm_sdk.models.generation import GenerationResponse
+        assert isinstance(response1, GenerationResponse)
+        assert isinstance(response2, GenerationResponse)
         assert len(conversation) == 4  # System + 2 user + 1 assistant
     
     @pytest.mark.asyncio
@@ -234,7 +242,8 @@ class TestEndToEnd:
             max_tokens=10
         )
         
-        assert isinstance(result, str)
+        from steer_llm_sdk.models.generation import GenerationResponse
+        assert isinstance(result, GenerationResponse)
         
         # Test with valid max_tokens
         result = await client.generate(
@@ -242,11 +251,12 @@ class TestEndToEnd:
             max_tokens=8192  # Maximum valid tokens
         )
         
-        assert isinstance(result, str)
+        from steer_llm_sdk.models.generation import GenerationResponse
+        assert isinstance(result, GenerationResponse)
         
         # Test that invalid values raise ValidationError during normalization
-        from steer_llm_sdk.llm.registry import normalize_params, get_config
-        from steer_llm_sdk.llm.registry import MODEL_CONFIGS
+        from steer_llm_sdk.core.routing import normalize_params, get_config
+        from steer_llm_sdk.core.routing import MODEL_CONFIGS
         
         # Get a config that exists
         config = MODEL_CONFIGS["gpt-4o-mini"]

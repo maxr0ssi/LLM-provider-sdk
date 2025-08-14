@@ -78,6 +78,20 @@ MODEL_CONFIGS = {
         "output_cost_per_1k_tokens": 0.0015,  # $1.50 per 1M = $0.0015 per 1K
         "cached_input_cost_per_1k_tokens": 0.00007  # ~$0.07 per 1M = $0.00007 per 1K
     },
+    "claude-3-5-haiku-20241022": {
+        "name": "Claude 3.5 Haiku",
+        "display_name": "Claude 3.5 Haiku",
+        "provider": "anthropic",
+        "llm_model_id": "claude-3-5-haiku-20241022",
+        "description": "Anthropic's latest fast and efficient model with improved capabilities",
+        "max_tokens": 8192,
+        "temperature": 0.7,
+        "enabled": True,
+        "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.001,   # $1.00 per 1M
+        "output_cost_per_1k_tokens": 0.005,  # $5.00 per 1M
+        "cached_input_cost_per_1k_tokens": 0.0001  # $0.10 per 1M
+    },
     "o4-mini": {
         "name": "O4 Mini",
         "display_name": "O4 Mini",

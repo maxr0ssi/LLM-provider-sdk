@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from fastapi import HTTPException
 
-from steer_llm_sdk.llm.router import LLMRouter
+from steer_llm_sdk.core.routing import LLMRouter
 from steer_llm_sdk.models.generation import (
     GenerationParams,
     GenerationResponse,
@@ -20,9 +20,9 @@ class TestLLMRouter:
     @pytest.fixture
     def router(self, mock_provider):
         """Create a router instance with mocked providers."""
-        with patch('steer_llm_sdk.llm.router.openai_provider', mock_provider), \
-             patch('steer_llm_sdk.llm.router.anthropic_provider', mock_provider), \
-             patch('steer_llm_sdk.llm.router.xai_provider', mock_provider):
+        with patch('steer_llm_sdk.core.routing.router.openai_provider', mock_provider), \
+             patch('steer_llm_sdk.core.routing.router.anthropic_provider', mock_provider), \
+             patch('steer_llm_sdk.core.routing.router.xai_provider', mock_provider):
             return LLMRouter()
     
     @pytest.fixture
@@ -48,10 +48,10 @@ class TestLLMRouter:
     @pytest.mark.asyncio
     async def test_generate_simple_prompt(self, router, mock_provider):
         """Test generation with simple string prompt."""
-        with patch('steer_llm_sdk.llm.registry.get_config') as mock_get_config, \
-             patch('steer_llm_sdk.llm.registry.check_lightweight_availability', return_value=True), \
-             patch('steer_llm_sdk.llm.registry.normalize_params') as mock_normalize, \
-             patch('steer_llm_sdk.llm.registry.calculate_cost', return_value=0.000015):
+        with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config, \
+             patch('steer_llm_sdk.core.routing.selector.check_lightweight_availability', return_value=True), \
+             patch('steer_llm_sdk.core.routing.selector.normalize_params') as mock_normalize, \
+             patch('steer_llm_sdk.core.routing.selector.calculate_cost', return_value=0.000015):
             
             # Setup mocks
             mock_get_config.return_value = ModelConfig(
@@ -92,9 +92,9 @@ class TestLLMRouter:
             ConversationMessage(role=ConversationRole.USER, content="Hello")
         ]
         
-        with patch('steer_llm_sdk.llm.registry.get_config') as mock_get_config, \
-             patch('steer_llm_sdk.llm.registry.check_lightweight_availability', return_value=True), \
-             patch('steer_llm_sdk.llm.registry.normalize_params') as mock_normalize:
+        with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config, \
+             patch('steer_llm_sdk.core.routing.selector.check_lightweight_availability', return_value=True), \
+             patch('steer_llm_sdk.core.routing.selector.normalize_params') as mock_normalize:
             
             mock_get_config.return_value = ModelConfig(
                 name="test",
@@ -127,8 +127,9 @@ class TestLLMRouter:
     @pytest.mark.asyncio
     async def test_generate_model_not_available(self, router):
         """Test generation when model is not available."""
-        with patch('steer_llm_sdk.llm.registry.get_config'), \
-             patch('steer_llm_sdk.llm.registry.check_lightweight_availability', return_value=False):
+        with patch('steer_llm_sdk.core.routing.selector.get_config'), \
+             patch('steer_llm_sdk.core.routing.selector.check_lightweight_availability', return_value=False), \
+             patch('os.getenv', return_value=None):
             
             with pytest.raises(HTTPException) as exc_info:
                 await router.generate("Test", "unavailable-model", {})
@@ -142,9 +143,9 @@ class TestLLMRouter:
         # When a model doesn't exist, get_config returns the default model
         # This is expected behavior - the SDK provides a fallback
         
-        with patch('steer_llm_sdk.llm.registry.get_config') as mock_get_config, \
-             patch('steer_llm_sdk.llm.registry.check_lightweight_availability', return_value=True), \
-             patch('steer_llm_sdk.llm.registry.normalize_params') as mock_normalize:
+        with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config, \
+             patch('steer_llm_sdk.core.routing.selector.check_lightweight_availability', return_value=True), \
+             patch('steer_llm_sdk.core.routing.selector.normalize_params') as mock_normalize:
             
             # Return default model config for non-existent model
             mock_get_config.return_value = ModelConfig(
@@ -173,9 +174,9 @@ class TestLLMRouter:
         mock_provider = Mock()
         mock_provider.generate = AsyncMock(side_effect=Exception("Provider error"))
         
-        with patch('steer_llm_sdk.llm.registry.get_config') as mock_get_config, \
-             patch('steer_llm_sdk.llm.registry.check_lightweight_availability', return_value=True), \
-             patch('steer_llm_sdk.llm.registry.normalize_params'):
+        with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config, \
+             patch('steer_llm_sdk.core.routing.selector.check_lightweight_availability', return_value=True), \
+             patch('steer_llm_sdk.core.routing.selector.normalize_params'):
             
             mock_get_config.return_value = ModelConfig(
                 name="test",
@@ -196,9 +197,9 @@ class TestLLMRouter:
     @pytest.mark.asyncio
     async def test_generate_stream(self, router, mock_provider):
         """Test streaming generation."""
-        with patch('steer_llm_sdk.llm.registry.get_config') as mock_get_config, \
-             patch('steer_llm_sdk.llm.registry.check_lightweight_availability', return_value=True), \
-             patch('steer_llm_sdk.llm.registry.normalize_params') as mock_normalize:
+        with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config, \
+             patch('steer_llm_sdk.core.routing.selector.check_lightweight_availability', return_value=True), \
+             patch('steer_llm_sdk.core.routing.selector.normalize_params') as mock_normalize:
             
             mock_get_config.return_value = ModelConfig(
                 name="test",

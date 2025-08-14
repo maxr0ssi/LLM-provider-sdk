@@ -5,19 +5,20 @@ import json
 import time
 from typing import Any, Dict
 
-from ...llm.capabilities import get_capabilities_for_model
-from ...llm.router import LLMRouter
-from ..errors import ProviderError
-from ..metrics import AgentMetrics, MetricsSink
+from ...core.capabilities import get_capabilities_for_model
+from ...core.routing import LLMRouter
+from ...reliability.errors import ProviderError
+from ...observability import AgentMetrics, MetricsSink
 from ..models.agent_definition import AgentDefinition
 from ..models.agent_options import AgentOptions
 from ..models.agent_result import AgentResult
-from ..retry import RetryConfig, RetryManager
+from ...reliability.retry import RetryConfig, RetryManager
 from ..validators.json_schema import validate_json_schema
 from .determinism import apply_deterministic_policy
-from .event_manager import EventManager
-from .idempotency import IdempotencyManager
-from .stream_adapter import StreamAdapter
+from ...streaming.manager import EventManager
+from ...reliability.idempotency import IdempotencyManager
+from ...streaming.adapter import StreamAdapter
+from ...reliability.budget import clamp_params_to_budget
 
 
 class AgentRunner:
@@ -41,12 +42,9 @@ class AgentRunner:
         # Apply deterministic policy
         params: Dict[str, Any] = apply_deterministic_policy(dict(definition.parameters), definition.model) if opts.deterministic else dict(definition.parameters)
 
-        # Enforce token budget by clamping max_tokens if provided
+        # Enforce token budget by clamping params centrally
         budget = opts.budget or {}
-        if isinstance(budget, dict) and "tokens" in budget:
-            max_tokens = int(budget["tokens"])
-            existing = int(params.get("max_tokens", max_tokens))
-            params["max_tokens"] = min(existing, max_tokens)
+        params = clamp_params_to_budget(params, budget)
 
         # Attach schema request when supported
         if definition.json_schema and caps.supports_json_schema:
