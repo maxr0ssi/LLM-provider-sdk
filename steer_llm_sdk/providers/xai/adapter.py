@@ -18,6 +18,7 @@ from ...core.normalization.params import normalize_params
 from ...core.normalization.usage import normalize_usage
 from ...observability.logging import ProviderLogger
 from ...streaming import StreamAdapter
+from .streaming import stream_chat, stream_chat_with_usage
 
 
 logger = ProviderLogger("xai")
@@ -127,21 +128,10 @@ class XAIProvider(ProviderAdapter):
                 # Add messages to parameters
                 xai_params["messages"] = formatted
                 
-                # Create chat and stream response
+                # Create chat and stream response using helper
                 chat = await self.client.chat.create(**xai_params)
-                
-                # Handle potential coroutine from chat.stream()
-                stream_iter = chat.stream()
-                if inspect.iscoroutine(stream_iter):
-                    stream_iter = await stream_iter
-                    
-                async for response, chunk in stream_iter:
-                    # Use adapter for normalization - xAI returns tuple of (response, chunk)
-                    delta = adapter.normalize_delta((response, chunk))
-                    text = delta.get_text()
-                    if text:
-                        adapter.track_chunk(len(text))
-                        yield text
+                async for text in stream_chat(chat, adapter):
+                    yield text
                     
             except Exception as e:
                 raise ErrorMapper.map_xai_error(e)
@@ -210,59 +200,22 @@ class XAIProvider(ProviderAdapter):
                 # Add messages to parameters
                 xai_params["messages"] = formatted
                 
-                # Create chat and stream response
+                # Create chat and stream response using helper
                 chat = await self.client.chat.create(**xai_params)
-                
-                collected_chunks = []
-                finish_reason = None
-                
-                # Handle potential coroutine from chat.stream()
-                stream_iter = chat.stream()
-                if inspect.iscoroutine(stream_iter):
-                    stream_iter = await stream_iter
-                
-                async for response, chunk in stream_iter:
-                    # Use adapter for normalization - xAI returns tuple of (response, chunk)
-                    delta = adapter.normalize_delta((response, chunk))
-                    text = delta.get_text()
-                    
-                    if text:
-                        adapter.track_chunk(len(text))
-                        collected_chunks.append(text)
-                        yield (text, None)
-                    
-                    # Check if response has finish reason
-                    if hasattr(response, 'choices') and response.choices:
-                        if hasattr(response.choices[0], 'finish_reason'):
-                            finish_reason = response.choices[0].finish_reason
-                
-                # After streaming completes, estimate usage
-                # Since xAI may not provide detailed usage, we estimate
-                full_text = ''.join(collected_chunks)
-                
-                # Rough token estimation (4 chars per token on average)
-                prompt_tokens = len(prompt_text) // 4
-                completion_tokens = len(full_text) // 4
-                
-                usage = {
-                    "prompt_tokens": prompt_tokens,
-                    "completion_tokens": completion_tokens,
-                    "total_tokens": prompt_tokens + completion_tokens,
-                    "cache_info": {}  # xAI doesn't provide cache info
-                }
-                
-                # Log usage
-                logger.log_usage(usage, params.model, request_info['request_id'])
-                
-                # Yield final usage data
-                yield (None, {
-                    "usage": usage,
-                    "model": params.model,
-                    "provider": "xai",
-                    "finish_reason": finish_reason or "stop",
-                    "cost_usd": None,  # Cost calculation should be done in router/core
-                    "cost_breakdown": None
-                })
+                async for item in stream_chat_with_usage(chat, adapter, prompt_text):
+                    if isinstance(item, tuple) and item[0] is None and item[1] is not None:
+                        usage = item[1]["usage"]
+                        logger.log_usage(usage, params.model, request_info['request_id'])
+                        yield (None, {
+                            "usage": usage,
+                            "model": params.model,
+                            "provider": "xai",
+                            "finish_reason": item[1].get("finish_reason"),
+                            "cost_usd": None,
+                            "cost_breakdown": None
+                        })
+                    else:
+                        yield item
                 
             except Exception as e:
                 raise ErrorMapper.map_xai_error(e)

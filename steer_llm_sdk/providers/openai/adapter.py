@@ -11,7 +11,7 @@ from ..errors import ErrorMapper
 from ...models.conversation_types import ConversationMessage
 from ...models.generation import GenerationParams, GenerationResponse
 from ...core.capabilities import (
-    get_capabilities_for_model, 
+    get_capabilities_for_model,
     format_responses_api_schema,
     get_cache_control_config,
     supports_prompt_caching
@@ -20,6 +20,9 @@ from ...core.normalization.params import normalize_params, transform_messages_fo
 from ...core.normalization.usage import normalize_usage
 from ...observability.logging import ProviderLogger
 from ...streaming import StreamAdapter
+from .payloads import build_responses_api_payload, apply_prompt_cache_control
+from .parsers import extract_text_from_responses_api
+from .streaming import stream_responses_api, stream_responses_api_with_usage
 
 logger = ProviderLogger("openai")
 
@@ -50,40 +53,7 @@ class OpenAIProvider(ProviderAdapter):
     
     def _build_responses_api_payload(self, params: GenerationParams, openai_params: dict, 
                                    transformed_messages: Any, text_config: Optional[dict] = None) -> dict:
-        """Build payload for OpenAI Responses API."""
-        responses_payload: Dict[str, Any] = {
-            "model": params.model,
-        }
-        
-        # Add transformed messages (either as input or instructions+messages)
-        if isinstance(transformed_messages, dict):
-            responses_payload.update(transformed_messages)
-        else:
-            responses_payload["input"] = transformed_messages
-        
-        # Copy only Responses API compatible parameters
-        # Responses API accepts: temperature, top_p, max_output_tokens, seed, stop
-        responses_api_params = ["temperature", "top_p", "seed", "stop"]
-        for key in responses_api_params:
-            if key in openai_params and openai_params[key] is not None:
-                responses_payload[key] = openai_params[key]
-        
-        # Handle max tokens mapping
-        if "max_completion_tokens" in openai_params:
-            responses_payload["max_output_tokens"] = openai_params["max_completion_tokens"]
-        elif "max_tokens" in openai_params:
-            responses_payload["max_output_tokens"] = openai_params["max_tokens"]
-            
-        if text_config is not None:
-            responses_payload["text"] = text_config
-            
-        # Optional: reasoning and metadata pass-through if provided
-        if hasattr(params, "reasoning") and getattr(params, "reasoning") is not None:
-            responses_payload["reasoning"] = getattr(params, "reasoning")
-        if hasattr(params, "metadata") and getattr(params, "metadata") is not None:
-            responses_payload["metadata"] = getattr(params, "metadata")
-            
-        return responses_payload
+        return build_responses_api_payload(params, openai_params, transformed_messages, text_config)
     
 
     async def generate(self, 
@@ -111,14 +81,8 @@ class OpenAIProvider(ProviderAdapter):
                 # Use normalization function to prepare parameters
                 caps = get_capabilities_for_model(params.model)
                 
-                # Enable prompt caching for long system messages based on capabilities
-                if formatted_messages and formatted_messages[0].get("role") == "system":
-                    system_content = formatted_messages[0].get("content", "")
-                    cache_config = get_cache_control_config(
-                        caps, "openai", len(system_content)
-                    )
-                    if cache_config:
-                        formatted_messages[0]["cache_control"] = cache_config
+                # Enable prompt caching for long system messages (moved to payload helper)
+                formatted_messages = apply_prompt_cache_control(caps, formatted_messages)
                 
                 openai_params = normalize_params(params, params.model, "openai", caps)
                 
@@ -147,26 +111,7 @@ class OpenAIProvider(ProviderAdapter):
                     )
 
                     response = await self.client.responses.create(**responses_payload, timeout=self._timeout)
-
-                    # Extract text or structured output
-                    text_content = None
-                    if hasattr(response, "output_text") and response.output_text:
-                        text_content = response.output_text
-                    elif hasattr(response, "output") and response.output:
-                        try:
-                            first = response.output[0]
-                            if hasattr(first, "content") and first.content:
-                                part = first.content[0]
-                                # part may have .text or .json
-                                if hasattr(part, "text") and part.text is not None:
-                                    text_content = part.text
-                                elif hasattr(part, "json") and part.json is not None:
-                                    text_content = json.dumps(part.json)
-                        except Exception:
-                            text_content = None
-
-                    if text_content is None:
-                        text_content = ""
+                    text_content = extract_text_from_responses_api(response) or ""
 
                     # Usage extraction with normalization
                     usage_dict = None
@@ -285,13 +230,8 @@ class OpenAIProvider(ProviderAdapter):
                             params, openai_params, transformed_messages, text_config
                         )
                         responses_payload["stream"] = True
-
-                        stream = await self.client.responses.create(**responses_payload, timeout=self._timeout)
-                        # Yield only incremental deltas to avoid duplicate full-text emission
-                        async for event in stream:
-                            piece = getattr(event, "delta", None)
-                            if piece:
-                                yield str(piece)
+                        async for piece in stream_responses_api(self.client, responses_payload, adapter):
+                            yield piece
                         return
                     except Exception as e:
                         logger.debug(
@@ -369,14 +309,8 @@ class OpenAIProvider(ProviderAdapter):
                 # Get capabilities for model
                 caps = get_capabilities_for_model(params.model)
                 
-                # Enable prompt caching for long system messages based on capabilities
-                if formatted_messages and formatted_messages[0].get("role") == "system":
-                    system_content = formatted_messages[0].get("content", "")
-                    cache_config = get_cache_control_config(
-                        caps, "openai", len(system_content)
-                    )
-                    if cache_config:
-                        formatted_messages[0]["cache_control"] = cache_config
+                # Enable prompt caching for long system messages (moved to payload helper)
+                formatted_messages = apply_prompt_cache_control(caps, formatted_messages)
                 
                 # Use normalization function to prepare parameters
                 openai_params = normalize_params(params, params.model, "openai", caps)
@@ -416,31 +350,8 @@ class OpenAIProvider(ProviderAdapter):
                             params, openai_params, transformed_messages, text_config
                         )
                         responses_payload["stream"] = True
-
-                        stream = await self.client.responses.create(**responses_payload, timeout=self._timeout)
-                        collected = []
-                        # Yield only incremental deltas to avoid duplicate full-text emission
-                        async for event in stream:
-                            piece = getattr(event, "delta", None)
-                            if piece:
-                                text = str(piece)
-                                collected.append(text)
-                                yield (text, None)
-                        # After stream completes, no usage extracted (API variance); yield final usage as None
-                        full_text = "".join(collected)
-                        yield (None, {
-                            "usage": {
-                                "prompt_tokens": 0,
-                                "completion_tokens": 0,
-                                "total_tokens": 0,
-                                "cache_info": {}
-                            },
-                            "model": params.model,
-                            "provider": "openai",
-                            "finish_reason": None,
-                            "cost_usd": None,
-                            "cost_breakdown": None
-                        })
+                        async for item in stream_responses_api_with_usage(self.client, responses_payload, adapter):
+                            yield item
                         return
                     except Exception as e:
                         logger.debug(
