@@ -134,15 +134,16 @@ steer_llm_sdk/
   - [x] Remove old hardcoded logic ✅
   - [x] Verify consistency across providers ✅
 
-### Phase 2: Capability Registry Hardening 🟡
-**Status**: IN PROGRESS
+### Phase 2: Capability Registry Hardening 🟢
+**Status**: COMPLETE (2025-08-15)
 **Target**: 1-2 weeks
+**Progress**: 100%
 **Dependencies**: Phase 1 complete
 
 #### Tasks:
-- [ ] 2.1 Capability Audit (verify all shipped models’ flags: supports_json_schema, supports_temperature, fixed_temperature, uses_max_completion_tokens, supports_seed, supports_prompt_caching)
-- [ ] 2.2 Capability-Driven Routing (ensure router/policy paths rely only on capabilities, no name heuristics)
-- [ ] 2.3 Provider Capability Handling (providers reference normalization + capabilities consistently; remove any residual name checks)
+- [x] 2.1 Capability Audit (verify all shipped models' flags: supports_json_schema, supports_temperature, fixed_temperature, uses_max_completion_tokens, supports_seed, supports_prompt_caching)
+- [x] 2.2 Capability-Driven Routing (ensure router/policy paths rely only on capabilities, no name heuristics)
+- [x] 2.3 Provider Capability Handling (providers reference normalization + capabilities consistently; remove any residual name checks)
 
 #### Detailed Plan (Phase 2)
 
@@ -249,7 +250,7 @@ steer_llm_sdk/
 **Dependencies**: Phase 1-6 complete
 
 #### Tasks:
-- [ ] 7.1 OpenAI Agents SDK Adapter
+- [ ] 7.1 OpenAI Agents SDK Adapter !
 
 ### Phase 8: Testing & Validation 🔴
 **Status**: NOT STARTED
@@ -266,7 +267,6 @@ steer_llm_sdk/
 - ✅ All files < 400 LOC
 - ⏳ No hardcoded provider logic in core
 - ⏳ Clean layer separation achieved
-- ⏳ Compatibility shims in place (main.py → api/client.py)
 
 ### Functionality Metrics  
 - ✅ All existing tests pass
@@ -282,7 +282,7 @@ steer_llm_sdk/
 - ⏳ All interfaces documented
 - ⏳ Extension guides complete
 - ⏳ Migration guide available
- - ⏳ Layer READMEs created
+- ⏳ Layer READMEs created
 
 ## Risks & Mitigations
 
@@ -337,9 +337,37 @@ steer_llm_sdk/
 - ✅ All smoke tests passing (8/8)
 - Phase 1 now at 100% completion
 
+### 2025-08-14
+- Started Phase 2: Capability Registry Hardening
+- ✅ Day 1 tasks completed:
+  - Added `supports_temperature` flag to ProviderCapabilities
+  - Added `uses_max_output_tokens_in_responses_api` flag for Responses API
+  - Added flagship models (gpt-4o, gpt-4.1, gpt-5, gpt-5-nano) to MODEL_CAPABILITIES
+  - Verified all capability flags are accurate
+  - Verified pricing alignment across models
+  - Identified hardcoded checks to remove in params.py
+- Phase 2 now at 30% completion
+
+### 2025-08-15
+- Completed Phase 2: Capability Registry Hardening
+- ✅ Created policy helpers in `core/capabilities/policy.py`:
+  - `map_max_tokens_field()` - Capability-driven parameter mapping
+  - `apply_temperature_policy()` - Temperature handling based on capabilities
+  - `format_responses_api_schema()` - Proper schema formatting for Responses API
+  - `should_use_responses_api()` - Capability-based API selection
+  - `get_deterministic_settings()` - Deterministic mode parameters
+  - `supports_prompt_caching()` and `get_cache_control_config()` - Caching helpers
+- ✅ Removed all hardcoded model name checks from `params.py`
+- ✅ Updated normalization to use policy helpers
+- ✅ Updated OpenAI adapter to use `format_responses_api_schema()`
+- ✅ Added versioned model aliases for compatibility
+- ✅ Created comprehensive test suite (20 tests) for policy helpers
+- ✅ Created capability reference documentation
+- Phase 2 now at 100% completion
+
 ## Current Status Summary
 
-**Current Focus**: Phase 2 (Capability Registry Hardening) ready to begin
+**Current Focus**: Phase 3 (Provider Adapter Clean Split) ready to begin
 
 ### Phase 1 Achievements:
 1. Clean provider abstraction with ProviderAdapter interface
@@ -348,11 +376,18 @@ steer_llm_sdk/
 4. Improved Responses API support
 5. Capability-driven behavior throughout
 
+### Phase 2 Achievements:
+1. All models have complete capability definitions
+2. Policy helpers enforce capability-driven behavior
+3. No hardcoded model name checks remain
+4. Comprehensive test coverage for capabilities
+5. Clear documentation for adding new models
+
 ### Next Immediate Steps:
-1. Begin Phase 2: Capability Registry Hardening
-2. Complete capability definitions for all models
-3. Implement capability-driven routing
-4. Remove any remaining hardcoded provider logic
+1. Begin Phase 3: Provider Adapter Clean Split
+2. Isolate provider-specific logic
+3. Standardize logging across providers
+4. Ensure consistent error handling
 
 ### Work Completed in Phase 1:
 - ✅ ProviderAdapter base class in `providers/base.py`
@@ -363,5 +398,5 @@ steer_llm_sdk/
 
 ---
 
-Last Updated: 2025-08-14
-Next Review: After Phase 2 progress
+Last Updated: 2025-08-15
+Next Review: After Phase 2 Day 2

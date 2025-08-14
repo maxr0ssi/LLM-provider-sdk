@@ -26,6 +26,7 @@ class ProviderCapabilities(BaseModel):
     
     # API differences
     uses_max_completion_tokens: bool = Field(False, description="Uses max_completion_tokens instead of max_tokens")
+    uses_max_output_tokens_in_responses_api: bool = Field(False, description="Uses max_output_tokens in Responses API")
     supports_system_message: bool = Field(True, description="Supports system role in messages")
     supports_response_format: bool = Field(False, description="Supports response_format parameter")
     
@@ -42,6 +43,7 @@ class ProviderCapabilities(BaseModel):
     deterministic_top_p: float = Field(1.0, description="Top-p value for deterministic mode")
     
     # Special behaviors
+    supports_temperature: bool = Field(True, description="Supports temperature parameter")
     requires_temperature_one: bool = Field(False, description="Requires temperature=1.0 (e.g., o1 models)")
     supports_multiple_system_messages: bool = Field(False, description="Supports multiple system messages")
     supports_image_inputs: bool = Field(False, description="Supports image inputs")
@@ -61,6 +63,7 @@ DEFAULT_CAPABILITIES = ProviderCapabilities(
     max_context_length=4096,
     max_output_tokens=4096,
     uses_max_completion_tokens=False,
+    uses_max_output_tokens_in_responses_api=False,
     supports_system_message=True,
     supports_response_format=False,
     supports_prompt_caching=False,
@@ -68,6 +71,7 @@ DEFAULT_CAPABILITIES = ProviderCapabilities(
     has_cached_pricing=False,
     deterministic_temperature_max=0.0,
     deterministic_top_p=1.0,
+    supports_temperature=True,
     requires_temperature_one=False,
     supports_multiple_system_messages=False,
     supports_image_inputs=False,
@@ -88,6 +92,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=128000,
         max_output_tokens=16384,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=True,  # Responses API uses max_output_tokens
         supports_system_message=True,
         supports_response_format=True,
         supports_prompt_caching=True,
@@ -96,6 +101,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=True,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         supports_image_inputs=True,
         streaming_includes_usage=True,
         streaming_delta_format="text"
@@ -110,6 +116,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=8192,
         max_output_tokens=2048,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=True,  # Responses API uses max_output_tokens
         supports_system_message=True,
         supports_response_format=True,
         supports_prompt_caching=False,
@@ -117,6 +124,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=False,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         streaming_includes_usage=True,
         streaming_delta_format="text"
     ),
@@ -130,6 +138,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=16385,
         max_output_tokens=4096,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=False,
         supports_system_message=True,
         supports_response_format=False,
         supports_prompt_caching=False,
@@ -137,6 +146,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=False,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         streaming_includes_usage=True,
         streaming_delta_format="text"
     ),
@@ -150,6 +160,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=128000,
         max_output_tokens=65536,
         uses_max_completion_tokens=True,  # Uses max_completion_tokens
+        uses_max_output_tokens_in_responses_api=True,  # Responses API uses max_output_tokens
         supports_system_message=True,
         supports_response_format=True,
         supports_prompt_caching=True,
@@ -158,6 +169,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=True,
         deterministic_temperature_max=1.0,  # Must use temperature=1.0
         deterministic_top_p=1.0,
+        supports_temperature=True,
         requires_temperature_one=True,  # Special requirement
         streaming_includes_usage=True,
         streaming_delta_format="text"
@@ -172,6 +184,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=128000,
         max_output_tokens=16384,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=True,  # Responses API uses max_output_tokens
         supports_system_message=True,
         supports_response_format=True,
         supports_prompt_caching=True,
@@ -180,6 +193,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=True,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         supports_image_inputs=True,
         streaming_includes_usage=True,
         streaming_delta_format="text"
@@ -195,6 +209,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=256000,  # Larger context window
         max_output_tokens=32768,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=True,  # Responses API uses max_output_tokens
         supports_system_message=True,
         supports_response_format=True,  # Native JSON schema
         supports_prompt_caching=True,
@@ -203,7 +218,107 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=True,
         deterministic_temperature_max=0.1,  # Allows slight variation
         deterministic_top_p=1.0,
+        supports_temperature=False,  # GPT-5 mini doesn't support temperature in Responses API
         supports_image_inputs=True,
+        streaming_includes_usage=True,
+        streaming_delta_format="text"
+    ),
+    
+    # GPT-4o (flagship)
+    "gpt-4o": ProviderCapabilities(
+        supports_json_schema=True,
+        supports_streaming=True,
+        supports_tools=True,
+        supports_seed=True,
+        supports_logprobs=True,
+        max_context_length=128000,
+        max_output_tokens=16384,
+        uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=True,  # Responses API uses max_output_tokens
+        supports_system_message=True,
+        supports_response_format=True,
+        supports_prompt_caching=True,
+        cache_ttl_seconds=300,
+        has_input_output_pricing=True,
+        has_cached_pricing=True,
+        deterministic_temperature_max=0.0,
+        deterministic_top_p=1.0,
+        supports_temperature=True,
+        supports_image_inputs=True,
+        streaming_includes_usage=True,
+        streaming_delta_format="text"
+    ),
+    
+    # GPT-4.1 (flagship)
+    "gpt-4.1": ProviderCapabilities(
+        supports_json_schema=True,
+        supports_streaming=True,
+        supports_tools=True,
+        supports_seed=True,
+        supports_logprobs=True,
+        max_context_length=128000,
+        max_output_tokens=16384,
+        uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=True,  # Responses API uses max_output_tokens
+        supports_system_message=True,
+        supports_response_format=True,
+        supports_prompt_caching=True,
+        cache_ttl_seconds=300,
+        has_input_output_pricing=True,
+        has_cached_pricing=True,
+        deterministic_temperature_max=0.0,
+        deterministic_top_p=1.0,
+        supports_temperature=True,
+        supports_image_inputs=True,
+        streaming_includes_usage=True,
+        streaming_delta_format="text"
+    ),
+    
+    # GPT-5 (flagship)
+    "gpt-5": ProviderCapabilities(
+        supports_json_schema=True,
+        supports_streaming=True,
+        supports_tools=True,
+        supports_seed=True,
+        supports_logprobs=True,
+        max_context_length=512000,  # Even larger context
+        max_output_tokens=65536,
+        uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=True,  # Responses API uses max_output_tokens
+        supports_system_message=True,
+        supports_response_format=True,
+        supports_prompt_caching=True,
+        cache_ttl_seconds=600,
+        has_input_output_pricing=True,
+        has_cached_pricing=True,
+        deterministic_temperature_max=0.1,
+        deterministic_top_p=1.0,
+        supports_temperature=True,
+        supports_image_inputs=True,
+        streaming_includes_usage=True,
+        streaming_delta_format="text"
+    ),
+    
+    # GPT-5 nano
+    "gpt-5-nano": ProviderCapabilities(
+        supports_json_schema=True,
+        supports_streaming=True,
+        supports_tools=True,
+        supports_seed=True,
+        supports_logprobs=False,
+        max_context_length=16384,
+        max_output_tokens=4096,
+        uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=True,  # Responses API uses max_output_tokens
+        supports_system_message=True,
+        supports_response_format=True,
+        supports_prompt_caching=True,
+        cache_ttl_seconds=300,
+        has_input_output_pricing=True,
+        has_cached_pricing=True,
+        deterministic_temperature_max=0.0,
+        deterministic_top_p=1.0,
+        supports_temperature=True,
         streaming_includes_usage=True,
         streaming_delta_format="text"
     ),
@@ -218,6 +333,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=200000,
         max_output_tokens=4096,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=False,
         supports_system_message=True,
         supports_response_format=False,
         supports_prompt_caching=True,
@@ -226,6 +342,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=True,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         supports_multiple_system_messages=True,
         streaming_includes_usage=False,  # No usage in streaming
         streaming_delta_format="text"
@@ -240,6 +357,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=200000,
         max_output_tokens=8192,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=False,
         supports_system_message=True,
         supports_response_format=False,
         supports_prompt_caching=True,
@@ -248,6 +366,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=True,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         supports_multiple_system_messages=True,
         supports_image_inputs=True,
         streaming_includes_usage=False,
@@ -263,6 +382,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=200000,
         max_output_tokens=4096,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=False,
         supports_system_message=True,
         supports_response_format=False,
         supports_prompt_caching=True,
@@ -271,6 +391,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=True,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         supports_multiple_system_messages=True,
         supports_image_inputs=True,
         streaming_includes_usage=False,
@@ -287,6 +408,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=131072,
         max_output_tokens=4096,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=False,
         supports_system_message=True,
         supports_response_format=False,
         supports_prompt_caching=False,
@@ -294,6 +416,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=False,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         streaming_includes_usage=False,
         streaming_delta_format="text"
     ),
@@ -307,6 +430,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=131072,
         max_output_tokens=4096,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=False,
         supports_system_message=True,
         supports_response_format=False,
         supports_prompt_caching=False,
@@ -314,6 +438,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=False,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         streaming_includes_usage=False,
         streaming_delta_format="text"
     ),
@@ -327,6 +452,7 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         max_context_length=131072,
         max_output_tokens=8192,
         uses_max_completion_tokens=False,
+        uses_max_output_tokens_in_responses_api=False,
         supports_system_message=True,
         supports_response_format=False,
         supports_prompt_caching=False,
@@ -334,10 +460,38 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         has_cached_pricing=False,
         deterministic_temperature_max=0.0,
         deterministic_top_p=1.0,
+        supports_temperature=True,
         streaming_includes_usage=False,
         streaming_delta_format="text"
     ),
 }
+
+# Add versioned model aliases that point to the same capabilities
+MODEL_CAPABILITIES["o4-mini-2025-04-16"] = MODEL_CAPABILITIES["o4-mini"]
+MODEL_CAPABILITIES["gpt-4.1-mini-2025-04-14"] = MODEL_CAPABILITIES["gpt-4.1-mini"]
+MODEL_CAPABILITIES["claude-3-5-haiku-20241022"] = ProviderCapabilities(
+    supports_json_schema=False,
+    supports_streaming=True,
+    supports_tools=False,
+    supports_seed=False,
+    supports_logprobs=False,
+    max_context_length=200000,
+    max_output_tokens=8192,
+    uses_max_completion_tokens=False,
+    uses_max_output_tokens_in_responses_api=False,
+    supports_system_message=True,
+    supports_response_format=False,
+    supports_prompt_caching=True,
+    cache_ttl_seconds=300,
+    has_input_output_pricing=True,
+    has_cached_pricing=True,
+    deterministic_temperature_max=0.0,
+    deterministic_top_p=1.0,
+    supports_temperature=True,
+    supports_multiple_system_messages=True,
+    streaming_includes_usage=False,
+    streaming_delta_format="text"
+)
 
 
 def get_model_capabilities(model_id: str) -> ProviderCapabilities:

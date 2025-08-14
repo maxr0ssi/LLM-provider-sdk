@@ -9,6 +9,11 @@ without hardcoded model name checks.
 from typing import Any, Dict, Optional
 
 from ..capabilities.models import ProviderCapabilities, get_model_capabilities
+from ..capabilities.policy import (
+    map_max_tokens_field,
+    apply_temperature_policy,
+    should_use_responses_api as policy_should_use_responses_api
+)
 from ...models.generation import GenerationParams
 
 
@@ -49,34 +54,26 @@ def normalize_params(
     
     # Handle max tokens based on capabilities
     if params.max_tokens is not None:
-        if capabilities.uses_max_completion_tokens:
-            # Models like o4-mini use max_completion_tokens
-            normalized["max_completion_tokens"] = params.max_tokens
-        elif provider == "openai" and "gpt-5-mini" in model_id.lower():
-            # Responses API uses max_output_tokens
-            normalized["max_output_tokens"] = params.max_tokens
-        else:
-            # Standard max_tokens
-            normalized["max_tokens"] = params.max_tokens
+        # Use policy helper to determine correct field name
+        use_responses_api = policy_should_use_responses_api(
+            {"response_format": getattr(params, "response_format", None)},
+            capabilities
+        )
+        field_name = map_max_tokens_field(capabilities, provider, use_responses_api)
+        normalized[field_name] = params.max_tokens
     
     # Handle temperature based on capabilities
-    if capabilities.requires_temperature_one:
-        # Some models require temperature=1.0 (e.g., o1 models)
+    if hasattr(params, "temperature") and params.temperature is not None:
+        # Add temperature to params dict for policy application
+        temp_params = {"temperature": params.temperature}
+        # Apply temperature policy
+        temp_params = apply_temperature_policy(temp_params, capabilities)
+        # Copy temperature to normalized if it wasn't removed
+        if "temperature" in temp_params:
+            normalized["temperature"] = temp_params["temperature"]
+    elif capabilities.requires_temperature_one:
+        # Even if no temperature provided, some models require it
         normalized["temperature"] = 1.0
-    elif hasattr(params, "temperature") and params.temperature is not None:
-        # Check if model supports temperature
-        if provider == "openai" and "gpt-5-mini" in model_id.lower():
-            # GPT-5 mini doesn't support temperature in Responses API
-            pass  # Omit temperature
-        elif capabilities.deterministic_temperature_max is not None:
-            # Clamp temperature for deterministic mode
-            if params.temperature <= capabilities.deterministic_temperature_max:
-                normalized["temperature"] = params.temperature
-            else:
-                normalized["temperature"] = capabilities.deterministic_temperature_max
-        else:
-            # Standard temperature
-            normalized["temperature"] = params.temperature
     
     # Handle top_p
     if hasattr(params, "top_p") and params.top_p is not None:

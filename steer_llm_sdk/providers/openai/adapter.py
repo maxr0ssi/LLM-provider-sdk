@@ -10,7 +10,7 @@ from openai import AsyncOpenAI
 from ..base import ProviderAdapter, ProviderError
 from ...models.conversation_types import ConversationMessage
 from ...models.generation import GenerationParams, GenerationResponse
-from ...core.capabilities import get_capabilities_for_model
+from ...core.capabilities import get_capabilities_for_model, format_responses_api_schema
 from ...core.normalization.params import normalize_params, transform_messages_for_provider, should_use_responses_api
 from ...core.normalization.usage import normalize_usage
 
@@ -122,21 +122,12 @@ class OpenAIProvider(ProviderAdapter):
                 schema_cfg = rf.get("json_schema") or rf.get("schema")
                 text_config = None
                 if schema_cfg:
-                    # Ensure root additionalProperties=false as required by Responses API
-                    try:
-                        schema_root = dict(schema_cfg)
-                    except Exception:
-                        schema_root = schema_cfg
-                    if isinstance(schema_root, dict) and "additionalProperties" not in schema_root:
-                        schema_root["additionalProperties"] = False
-                    text_config = {
-                        "format": {
-                            "type": "json_schema",
-                            "name": rf.get("name", "result"),
-                            "schema": schema_root,
-                            "strict": rf.get("strict", None),
-                        }
-                    }
+                    # Use policy helper to format schema properly
+                    text_config = format_responses_api_schema(
+                        schema_cfg,
+                        rf.get("name", "result"),
+                        rf.get("strict", None)
+                    )
                 # Transform messages for Responses API
                 use_instructions = getattr(params, "responses_use_instructions", False)
                 transformed_messages = transform_messages_for_provider(formatted_messages, "openai", use_instructions)

@@ -114,10 +114,10 @@ def normalize_params(raw_params: Dict, config: ModelConfig) -> GenerationParams:
 
 def get_capabilities(llm_model_id: str) -> ProviderCapabilities:
     """Get capabilities for a specific model.
-    
+
     Args:
         llm_model_id: Model ID to get capabilities for
-        
+
     Returns:
         ProviderCapabilities object
     """
@@ -129,6 +129,12 @@ def get_capabilities(llm_model_id: str) -> ProviderCapabilities:
         base_id = "gpt-4.1-mini"
     elif base_id.startswith("o4-mini"):
         base_id = "o4-mini"
+    elif base_id.startswith("gpt-5-mini"):
+        base_id = "gpt-5-mini"
+    elif base_id.startswith("gpt-5-nano"):
+        base_id = "gpt-5-nano"
+    elif base_id.startswith("gpt-5"):
+        base_id = "gpt-5"
     return get_model_capabilities(base_id)
 
 
