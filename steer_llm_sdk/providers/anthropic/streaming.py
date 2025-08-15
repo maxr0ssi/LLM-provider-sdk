@@ -16,7 +16,7 @@ async def stream_messages(
         delta = adapter.normalize_delta(event)
         text = delta.get_text()
         if text:
-            await adapter.track_chunk(len(text))
+            await adapter.track_chunk(len(text), text)
             yield text
 
 
@@ -35,7 +35,7 @@ async def stream_messages_with_usage(
         delta = adapter.normalize_delta(event)
         text = delta.get_text()
         if text:
-            await adapter.track_chunk(len(text))
+            await adapter.track_chunk(len(text), text)
             collected_chunks.append(text)
             yield (text, None)
 

@@ -46,7 +46,10 @@ class XAIProvider(ProviderAdapter):
         params: GenerationParams
     ) -> GenerationResponse:
         """Generate text using xAI API with conversation support."""
-        with logger.track_request("generate", params.model) as request_info:
+        # Extract request_id from raw_params if available
+        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        
+        with logger.track_request("generate", params.model, request_id=request_id) as request_info:
             try:
                 # Format messages for xAI chat
                 if isinstance(messages, str):
@@ -102,7 +105,10 @@ class XAIProvider(ProviderAdapter):
         params: GenerationParams
     ) -> AsyncGenerator[str, None]:
         """Generate text using xAI API with streaming support."""
-        with logger.track_request("stream", params.model) as request_info:
+        # Extract request_id from raw_params if available
+        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        
+        with logger.track_request("stream", params.model, request_id=request_id) as request_info:
             # Initialize StreamAdapter with model
             adapter = StreamAdapter("xai", params.model)
             
@@ -171,7 +177,10 @@ class XAIProvider(ProviderAdapter):
         Note: xAI's streaming API may not provide usage data in the same way as OpenAI/Anthropic.
         This implementation collects chunks and estimates usage based on the response.
         """
-        with logger.track_request("stream_with_usage", params.model) as request_info:
+        # Extract request_id from raw_params if available
+        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        
+        with logger.track_request("stream_with_usage", params.model, request_id=request_id) as request_info:
             # Initialize StreamAdapter with model for aggregation
             adapter = StreamAdapter("xai", params.model)
             

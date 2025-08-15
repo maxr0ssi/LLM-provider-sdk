@@ -85,21 +85,6 @@ class StreamingOptions:
     partial_response_recovery: bool = True
     """Whether to preserve partial responses for recovery."""
     
-    # Reliability options
-    connection_timeout: float = 30.0
-    """Timeout for establishing streaming connection."""
-    
-    read_timeout: float = 300.0
-    """Timeout for reading chunks from stream."""
-    
-    retry_on_connection_error: bool = True
-    """Retry on connection errors."""
-    
-    max_reconnect_attempts: int = 3
-    """Maximum reconnection attempts."""
-    
-    partial_response_recovery: bool = True
-    """Enable partial response recovery on reconnection."""
     
     def __post_init__(self):
         """Validate configuration after initialization."""
@@ -151,6 +136,12 @@ class StreamingOptions:
             "max_events_per_second": self.max_events_per_second,
             "log_streaming_metrics": self.log_streaming_metrics,
             "capture_raw_events": self.capture_raw_events,
+            # Reliability options
+            "connection_timeout": self.connection_timeout,
+            "read_timeout": self.read_timeout,
+            "retry_on_connection_error": self.retry_on_connection_error,
+            "max_reconnect_attempts": self.max_reconnect_attempts,
+            "partial_response_recovery": self.partial_response_recovery,
         }
 
 

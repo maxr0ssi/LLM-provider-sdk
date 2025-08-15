@@ -248,14 +248,28 @@ class LLMRouter:
         # Get circuit breaker
         circuit_breaker = self.circuit_manager.get(provider_name)
         
-        # Create streaming config based on model/provider settings
-        streaming_config = StreamingRetryConfig(
-            max_connection_attempts=3,
-            connection_timeout=30.0,
-            read_timeout=300.0,  # 5 minutes for long responses
-            reconnect_on_error=True,
-            preserve_partial_response=True
-        )
+        # Create streaming config based on streaming options or environment
+        # Check for streaming_options in extra fields (Pydantic v2)
+        extra_params = getattr(params, 'model_extra', {}) or getattr(params, 'kwargs', {})
+        streaming_options = extra_params.get('streaming_options')
+        if streaming_options:
+            # Use values from StreamingOptions
+            streaming_config = StreamingRetryConfig(
+                max_connection_attempts=streaming_options.max_reconnect_attempts,
+                connection_timeout=streaming_options.connection_timeout,
+                read_timeout=streaming_options.read_timeout,
+                reconnect_on_error=streaming_options.retry_on_connection_error,
+                preserve_partial_response=streaming_options.partial_response_recovery
+            )
+        else:
+            # Use environment variables or defaults
+            streaming_config = StreamingRetryConfig(
+                max_connection_attempts=int(os.getenv('STEER_STREAM_MAX_RECONNECTS', '3')),
+                connection_timeout=float(os.getenv('STEER_STREAM_CONN_TIMEOUT', '30.0')),
+                read_timeout=float(os.getenv('STEER_STREAM_READ_TIMEOUT', '300.0')),
+                reconnect_on_error=os.getenv('STEER_STREAM_RETRY_ON_ERROR', 'true').lower() == 'true',
+                preserve_partial_response=os.getenv('STEER_STREAM_PRESERVE_PARTIAL', 'true').lower() == 'true'
+            )
         
         # Define the stream function for retry
         async def create_stream():

@@ -53,7 +53,10 @@ class AnthropicProvider(ProviderAdapter):
                       messages: Union[str, List[ConversationMessage]], 
                       params: GenerationParams) -> GenerationResponse:
         """Generate text using Anthropic API with conversation support."""
-        with logger.track_request("generate", params.model) as request_info:
+        # Extract request_id from raw_params if available
+        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        
+        with logger.track_request("generate", params.model, request_id=request_id) as request_info:
             try:
                 # Handle backward compatibility - convert string prompt to messages
                 if isinstance(messages, str):
@@ -113,7 +116,10 @@ class AnthropicProvider(ProviderAdapter):
                             messages: Union[str, List[ConversationMessage]], 
                             params: GenerationParams) -> AsyncGenerator[str, None]:
         """Generate text using Anthropic API with streaming and conversation support."""
-        with logger.track_request("stream", params.model) as request_info:
+        # Extract request_id from raw_params if available
+        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        
+        with logger.track_request("stream", params.model, request_id=request_id) as request_info:
             # Initialize StreamAdapter
             adapter = StreamAdapter("anthropic", params.model)
             
@@ -232,7 +238,10 @@ class AnthropicProvider(ProviderAdapter):
         Yields tuples of (chunk, usage_data) where usage_data is None except
         for the final yield which contains the complete usage information.
         """
-        with logger.track_request("stream_with_usage", params.model) as request_info:
+        # Extract request_id from raw_params if available
+        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        
+        with logger.track_request("stream_with_usage", params.model, request_id=request_id) as request_info:
             # Initialize StreamAdapter
             adapter = StreamAdapter("anthropic", params.model)
             
@@ -342,7 +351,7 @@ class AnthropicProvider(ProviderAdapter):
                     text = delta.get_text()
                     
                     if text:
-                        await adapter.track_chunk(len(text))
+                        await adapter.track_chunk(len(text), text)
                         collected_chunks.append(text)
                         yield (text, None)
                     
