@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from enum import Enum
 
 
@@ -116,6 +116,7 @@ class StreamingResponseWithUsage:
         self.finish_reason = None
         self.cost_usd = None
         self.cost_breakdown = None
+        self.final_json = None  # Store final JSON from handler
     
     def add_chunk(self, chunk: str):
         """Add a chunk to the response."""
@@ -135,6 +136,18 @@ class StreamingResponseWithUsage:
     def get_text(self) -> str:
         """Get the complete text from all chunks."""
         return ''.join(self.chunks)
+    
+    def set_final_json(self, json_data: Optional[Union[Dict[str, Any], List[Any]]]):
+        """Set the final JSON data from the JSON handler."""
+        self.final_json = json_data
+    
+    def get_json(self) -> Optional[Union[Dict[str, Any], List[Any]]]:
+        """Get the final JSON data if available."""
+        return self.final_json
+    
+    def get_usage(self) -> Optional[Dict[str, Any]]:
+        """Get the usage data if available."""
+        return self.usage
     
     def __iter__(self):
         """Allow iteration over chunks."""

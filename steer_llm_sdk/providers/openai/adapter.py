@@ -172,8 +172,27 @@ class OpenAIProvider(ProviderAdapter):
         """Generate text using OpenAI API with streaming and conversation support."""
         with logger.track_request("stream", params.model) as request_info:
             # Initialize StreamAdapter
-            adapter = StreamAdapter("openai")
-            adapter.start_stream()
+            adapter = StreamAdapter("openai", params.model)
+            
+            # Configure streaming options if provided
+            # In Pydantic v2, extra fields are in model_extra
+            extra_params = getattr(params, 'model_extra', {}) or getattr(params, 'kwargs', {})
+            streaming_options = extra_params.get("streaming_options")
+            if streaming_options:
+                # Configure event processor
+                if hasattr(streaming_options, "event_processor") and streaming_options.event_processor:
+                    adapter.set_event_processor(streaming_options.event_processor, request_info.get('request_id'))
+                
+                # Configure JSON handler if response format is JSON
+                response_format = params.response_format or {}
+                if (hasattr(streaming_options, "enable_json_stream_handler") and 
+                    streaming_options.enable_json_stream_handler and 
+                    response_format.get("type") == "json_object"):
+                    adapter.set_response_format(response_format, enable_json_handler=True)
+                
+                # Configure usage aggregation (OpenAI provides usage in stream, so not needed)
+            
+            await adapter.start_stream()
             
             try:
                 # Handle backward compatibility - convert string prompt to messages
@@ -248,7 +267,7 @@ class OpenAIProvider(ProviderAdapter):
                         delta = adapter.normalize_delta(chunk)
                         text = delta.get_text()
                         if text:
-                            adapter.track_chunk(len(text))
+                            await adapter.track_chunk(len(text), text)
                             yield text
                 else:
                     # Standard Chat Completions streaming for non-Responses API models
@@ -258,12 +277,17 @@ class OpenAIProvider(ProviderAdapter):
                         delta = adapter.normalize_delta(chunk)
                         text = delta.get_text()
                         if text:
-                            adapter.track_chunk(len(text))
+                            await adapter.track_chunk(len(text), text)
                             yield text
                 
             except Exception as e:
+                await adapter.complete_stream(error=e)
                 raise ErrorMapper.map_openai_error(e)
             finally:
+                # Complete stream if not already done
+                if not adapter._stream_completed:
+                    await adapter.complete_stream()
+                
                 # Log streaming metrics
                 metrics = adapter.get_metrics()
                 logger.debug(
@@ -286,8 +310,27 @@ class OpenAIProvider(ProviderAdapter):
         """
         with logger.track_request("stream_with_usage", params.model) as request_info:
             # Initialize StreamAdapter
-            adapter = StreamAdapter("openai")
-            adapter.start_stream()
+            adapter = StreamAdapter("openai", params.model)
+            
+            # Configure streaming options if provided
+            # In Pydantic v2, extra fields are in model_extra
+            extra_params = getattr(params, 'model_extra', {}) or getattr(params, 'kwargs', {})
+            streaming_options = extra_params.get("streaming_options")
+            if streaming_options:
+                # Configure event processor
+                if hasattr(streaming_options, "event_processor") and streaming_options.event_processor:
+                    adapter.set_event_processor(streaming_options.event_processor, request_info.get('request_id'))
+                
+                # Configure JSON handler if response format is JSON
+                response_format = params.response_format or {}
+                if (hasattr(streaming_options, "enable_json_stream_handler") and 
+                    streaming_options.enable_json_stream_handler and 
+                    response_format.get("type") == "json_object"):
+                    adapter.set_response_format(response_format, enable_json_handler=True)
+                
+                # Configure usage aggregation (OpenAI provides usage in stream, so not needed)
+            
+            await adapter.start_stream()
             
             try:
                 # Handle backward compatibility - convert string prompt to messages
@@ -373,7 +416,7 @@ class OpenAIProvider(ProviderAdapter):
                     text = delta.get_text()
                     
                     if text:
-                        adapter.track_chunk(len(text))
+                        await adapter.track_chunk(len(text), text)
                         collected_chunks.append(text)
                         yield (text, None)
                     
@@ -391,6 +434,9 @@ class OpenAIProvider(ProviderAdapter):
                             
                             # Log usage
                             logger.log_usage(usage, params.model, request_info['request_id'])
+                            
+                            # Emit usage event
+                            await adapter.emit_usage(usage_dict, is_estimated=False)
                             
                             # Yield final usage data
                             yield (None, {
@@ -414,7 +460,7 @@ class OpenAIProvider(ProviderAdapter):
                         text = delta.get_text()
                         
                         if text:
-                            adapter.track_chunk(len(text))
+                            await adapter.track_chunk(len(text), text)
                             collected_chunks.append(text)
                             yield (text, None)
                         
@@ -433,6 +479,14 @@ class OpenAIProvider(ProviderAdapter):
                                 # Log usage
                                 logger.log_usage(usage, params.model, request_info['request_id'])
                                 
+                                # Emit usage event
+                                await adapter.emit_usage(usage_dict, is_estimated=False)
+                                
+                                # Get final JSON if JSON handler was used
+                                final_json = None
+                                if adapter.json_handler:
+                                    final_json = adapter.get_final_json()
+                                
                                 # Yield final usage data
                                 yield (None, {
                                     "usage": usage,
@@ -440,12 +494,18 @@ class OpenAIProvider(ProviderAdapter):
                                     "provider": "openai",
                                     "finish_reason": finish_reason,
                                     "cost_usd": None,  # Cost calculation should be done in router/core
-                                    "cost_breakdown": None
+                                    "cost_breakdown": None,
+                                    "final_json": final_json  # Include final JSON if available
                                 })
                 
             except Exception as e:
+                await adapter.complete_stream(error=e)
                 raise ErrorMapper.map_openai_error(e)
             finally:
+                # Complete stream if not already done
+                if not adapter._stream_completed:
+                    await adapter.complete_stream()
+                
                 # Log streaming metrics
                 metrics = adapter.get_metrics()
                 logger.debug(

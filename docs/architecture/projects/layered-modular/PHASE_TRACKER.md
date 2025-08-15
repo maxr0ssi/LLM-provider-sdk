@@ -3,6 +3,8 @@
 ## Overview
 This document tracks the progress of refactoring the Steer LLM SDK to a layered-modular architecture. The refactoring aims to create clear separation of concerns, enable easy addition of new providers/models, maintain backward compatibility and finally allow full agent use -- using external SDK Agent packages e.g. Open AI.
 
+**Documentation Organization**: Completed phase documentation has been moved to `completed-phases/` subdirectories for better organization.
+
 **CRITICAL UPDATE (2025-08-13)**: Added Phase 0.5 for directory restructuring. The current directory structure does not reflect the layered architecture, making it difficult to implement clean separation. Restructuring must happen BEFORE continuing with other phases. New modules to scaffold during this phase: `streaming/types.py`, `reliability/budget.py`.
 
 ## Phase Status Legend
@@ -167,14 +169,144 @@ steer_llm_sdk/
 - Upstream SDK changes → minimize per-adapter logic; rely on core helpers; cover with unit tests
 - Streaming event variance → encapsulate normalization in `StreamAdapter`; finalize usage in router when needed
 
-### Phase 4: Streaming & Events 🔴
-**Status**: NOT STARTED
-**Target**: 1 week
-**Dependencies**: Phase 1.4, Phase 3
+### Phase 4: Streaming & Events 🟢
+**Status**: COMPLETE (2025-08-15)
+**Target**: 1 week (Actual: 7 days)
+**Dependencies**: Phase 1.4, Phase 3 ✅
+
+#### Summary:
+Phase 4 successfully implemented a comprehensive streaming infrastructure with JSON handling, usage aggregation, and event processing. All components are fully integrated and tested end-to-end.
+
+#### Key Deliverables:
+- ✅ **JsonStreamHandler**: Robust JSON parsing with <0.3ms per chunk overhead
+- ✅ **UsageAggregator**: Accurate token counting with tiktoken and character-based fallback
+- ✅ **EventProcessor**: Flexible filtering and transformation pipeline with <1ms overhead
+- ✅ **StreamingOptions**: Clean configuration model with presets
+- ✅ **Full Integration**: All providers support streaming options, JSON handling, and events
+- ✅ **Documentation**: Complete guides and migration instructions
 
 #### Tasks:
-- [ ] 4.1 StreamAdapter Enhancement (normalize deltas across providers; JSON vs text; end-of-stream usage finalization)
-- [ ] 4.2 Event Consistency (emit on_start/on_delta/on_complete/on_error uniformly; optional metrics hooks)
+- [x] 4.1 StreamAdapter Enhancement (normalize deltas across providers; JSON vs text; end-of-stream usage finalization)
+  - [x] JsonStreamHandler implementation with full JSON parsing
+  - [x] StreamAdapter integration with JSON awareness
+  - [x] StreamingOptions configuration model
+  - [x] Client API updated with streaming options
+  - [x] End-of-stream usage finalization patterns (via UsageAggregator)
+- [x] 4.2 Event Consistency (emit on_start/on_delta/on_complete/on_error uniformly; optional metrics hooks)
+
+#### Progress:
+**Day 1-2 (COMPLETE):**
+- ✅ Created `JsonStreamHandler` in `streaming/json_handler.py`
+  - Handles nested JSON and arrays
+  - Streaming validation and repair
+  - Excellent performance: < 0.1ms for simple objects
+- ✅ Integrated JSON handler with StreamAdapter
+  - `set_response_format()` method
+  - JSON detection and processing
+  - Metrics integration
+- ✅ Created StreamingOptions configuration
+  - Consolidates all streaming settings
+  - Preset configurations (JSON_MODE, DEBUG, HIGH_PERFORMANCE)
+  - Backward compatible with legacy parameters
+- ✅ Updated client API
+  - `stream_with_usage` accepts StreamingOptions
+  - Auto-enables JSON mode for json_object response format
+  - Legacy `enable_json_stream_handler` parameter supported
+- ✅ Comprehensive testing
+  - 20 unit tests for JsonStreamHandler
+  - 16 edge case tests
+  - 10 StreamAdapter integration tests
+  - 7 provider-specific JSON streaming tests
+  - Performance benchmarks show < 0.3ms per chunk
+
+**Day 3-4 (COMPLETE):**
+- ✅ Created `UsageAggregator` in `streaming/aggregator.py`
+  - Base class with standard interface
+  - TiktokenAggregator for accurate OpenAI counting
+  - CharacterAggregator with provider-specific ratios
+  - Confidence scoring for estimation accuracy
+- ✅ Integrated aggregator with StreamAdapter
+  - `configure_usage_aggregation()` method
+  - Automatic chunk tracking
+  - Metrics integration
+- ✅ Updated xAI provider
+  - Now uses aggregator instead of simple division
+  - Respects StreamingOptions configuration
+  - Better accuracy (65% confidence vs 50%)
+- ✅ Enhanced StreamingOptions
+  - Added aggregator_type and prefer_tiktoken options
+  - Works with existing presets
+- ✅ Comprehensive testing
+  - 22 unit tests for aggregators
+  - 13 accuracy tests
+  - 12 integration tests
+  - Performance benchmarks
+
+**Day 5 (COMPLETE):**
+- ✅ Created `EventProcessor` in `streaming/processor.py`
+  - Base class with filtering and transformation pipeline
+  - TypeFilter, ProviderFilter, PredicateFilter, CompositeFilter
+  - CorrelationTransformer, TimestampTransformer, MetricsTransformer
+  - Background processing support
+- ✅ Created `BatchedEventProcessor` for efficient event batching
+  - Configurable batch size and timeout
+  - Async batch handler support
+  - Automatic flush on completion
+- ✅ Created typed event models in `models/events.py`
+  - StreamEvent base class
+  - StreamStartEvent, StreamDeltaEvent, StreamUsageEvent, StreamCompleteEvent, StreamErrorEvent
+  - Rich metadata support
+- ✅ Integrated EventProcessor with StreamAdapter
+  - `set_event_processor()` method for configuration
+  - Automatic event emission during streaming lifecycle
+  - Provider/model/request_id metadata injection
+  - Usage and error event support
+- ✅ Comprehensive testing
+  - 23 unit tests for EventProcessor
+  - 7 integration tests for StreamAdapter events
+  - All tests passing with <1ms event processing overhead
+
+**Day 6 (COMPLETE):**
+- ✅ Enhanced EventManager with typed event support
+  - Updated to support both typed and untyped callbacks
+  - Added emit_event method for typed event dispatch
+  - Backward compatible with legacy callbacks
+- ✅ Updated StreamingHelper for typed events
+  - All helper methods now use typed events
+  - Async adapter methods properly integrated
+  - Error events include retry information
+- ✅ Updated all providers for consistent event emission
+  - OpenAI, Anthropic, and xAI adapters updated
+  - Event processor configuration from streaming options
+  - Proper async start_stream, track_chunk, complete_stream calls
+  - Usage event emission integrated
+- ✅ Added event callbacks to client API
+  - stream_with_usage accepts on_start, on_delta, on_usage, on_complete, on_error
+  - Automatic EventManager and EventProcessor creation
+  - Seamless integration with streaming options
+- ✅ Created comprehensive tests and documentation
+  - Integration tests for event system
+  - Type hierarchy tests
+  - Complete streaming events guide with examples
+  - Migration guide for existing users
+
+**Integration Completion (2025-08-15):**
+- ✅ Fixed provider adapters to properly read StreamingOptions
+- ✅ Updated client to use JSON handler output instead of heuristic
+- ✅ Added final JSON pass-through in provider responses
+- ✅ Fixed Pydantic v2 compatibility issues
+- ✅ All integration tests passing
+
+#### Documentation:
+All Phase 4 documentation has been organized in `completed-phases/phase-4/`:
+- PHASE_4_PLAN.md - Initial planning document
+- PHASE_4_TECHNICAL_DESIGN.md - Detailed technical design
+- PHASE_4_SUMMARY.md - Research and proposal summary
+- PHASE_4_DAY1_2_SUMMARY.md - JSON handler implementation
+- PHASE_4_DAY3_4_SUMMARY.md - Usage aggregator implementation
+- PHASE_4_DAY5_SUMMARY.md - Event processor implementation
+- PHASE_4_DAY6_SUMMARY.md - Event system integration
+- PHASE_4_INTEGRATION_SUMMARY.md - Final integration completion
 
 ### Phase 5: Reliability Layer 🔴
 **Status**: NOT STARTED

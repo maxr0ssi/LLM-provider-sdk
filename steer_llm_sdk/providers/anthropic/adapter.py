@@ -115,8 +115,32 @@ class AnthropicProvider(ProviderAdapter):
         """Generate text using Anthropic API with streaming and conversation support."""
         with logger.track_request("stream", params.model) as request_info:
             # Initialize StreamAdapter
-            adapter = StreamAdapter("anthropic")
-            adapter.start_stream()
+            adapter = StreamAdapter("anthropic", params.model)
+            
+            # Configure streaming options if provided
+            # In Pydantic v2, extra fields are in model_extra
+            extra_params = getattr(params, 'model_extra', {}) or getattr(params, 'kwargs', {})
+            streaming_options = extra_params.get("streaming_options")
+            if streaming_options:
+                # Configure event processor
+                if hasattr(streaming_options, "event_processor") and streaming_options.event_processor:
+                    adapter.set_event_processor(streaming_options.event_processor, request_info.get('request_id'))
+                
+                # Configure JSON handler if response format is JSON
+                response_format = params.response_format or {}
+                if (hasattr(streaming_options, "enable_json_stream_handler") and 
+                    streaming_options.enable_json_stream_handler and 
+                    response_format.get("type") == "json_object"):
+                    adapter.set_response_format(response_format, enable_json_handler=True)
+                
+                # Configure usage aggregation if needed
+                if (hasattr(streaming_options, "enable_usage_aggregation") and 
+                    streaming_options.enable_usage_aggregation):
+                    # Anthropic provides usage data, but we can still enable if requested
+                    aggregator_type = getattr(streaming_options, "aggregator_type", "auto")
+                    adapter.configure_usage_aggregation(aggregator_type, messages)
+            
+            await adapter.start_stream()
             
             try:
                 # Handle backward compatibility - convert string prompt to messages
@@ -181,8 +205,13 @@ class AnthropicProvider(ProviderAdapter):
                     yield chunk
                 
             except Exception as e:
+                await adapter.complete_stream(error=e)
                 raise ErrorMapper.map_anthropic_error(e)
             finally:
+                # Complete stream if not already done
+                if not adapter._stream_completed:
+                    await adapter.complete_stream()
+                
                 # Log streaming metrics
                 metrics = adapter.get_metrics()
                 logger.debug(
@@ -205,8 +234,32 @@ class AnthropicProvider(ProviderAdapter):
         """
         with logger.track_request("stream_with_usage", params.model) as request_info:
             # Initialize StreamAdapter
-            adapter = StreamAdapter("anthropic")
-            adapter.start_stream()
+            adapter = StreamAdapter("anthropic", params.model)
+            
+            # Configure streaming options if provided
+            # In Pydantic v2, extra fields are in model_extra
+            extra_params = getattr(params, 'model_extra', {}) or getattr(params, 'kwargs', {})
+            streaming_options = extra_params.get("streaming_options")
+            if streaming_options:
+                # Configure event processor
+                if hasattr(streaming_options, "event_processor") and streaming_options.event_processor:
+                    adapter.set_event_processor(streaming_options.event_processor, request_info.get('request_id'))
+                
+                # Configure JSON handler if response format is JSON
+                response_format = params.response_format or {}
+                if (hasattr(streaming_options, "enable_json_stream_handler") and 
+                    streaming_options.enable_json_stream_handler and 
+                    response_format.get("type") == "json_object"):
+                    adapter.set_response_format(response_format, enable_json_handler=True)
+                
+                # Configure usage aggregation if needed
+                if (hasattr(streaming_options, "enable_usage_aggregation") and 
+                    streaming_options.enable_usage_aggregation):
+                    # Anthropic provides usage data, but we can still enable if requested
+                    aggregator_type = getattr(streaming_options, "aggregator_type", "auto")
+                    adapter.configure_usage_aggregation(aggregator_type, messages)
+            
+            await adapter.start_stream()
             
             try:
                 # Handle backward compatibility - convert string prompt to messages
@@ -365,6 +418,11 @@ class AnthropicProvider(ProviderAdapter):
                             # Log usage
                             logger.log_usage(usage, params.model, request_info['request_id'])
                             
+                            # Get final JSON if JSON handler was used
+                            final_json = None
+                            if adapter.json_handler:
+                                final_json = adapter.get_final_json()
+                            
                             # Yield final usage data
                             yield (None, {
                                 "usage": usage,
@@ -372,12 +430,18 @@ class AnthropicProvider(ProviderAdapter):
                                 "provider": "anthropic",
                                 "finish_reason": finish_reason,
                                 "cost_usd": None,  # Cost calculation should be done in router/core
-                                "cost_breakdown": None
+                                "cost_breakdown": None,
+                                "final_json": final_json  # Include final JSON if available
                             })
                     
             except Exception as e:
+                await adapter.complete_stream(error=e)
                 raise ErrorMapper.map_anthropic_error(e)
             finally:
+                # Complete stream if not already done
+                if not adapter._stream_completed:
+                    await adapter.complete_stream()
+                
                 # Log streaming metrics
                 metrics = adapter.get_metrics()
                 logger.debug(

@@ -103,9 +103,17 @@ class XAIProvider(ProviderAdapter):
     ) -> AsyncGenerator[str, None]:
         """Generate text using xAI API with streaming support."""
         with logger.track_request("stream", params.model) as request_info:
-            # Initialize StreamAdapter
-            adapter = StreamAdapter("xai")
-            adapter.start_stream()
+            # Initialize StreamAdapter with model
+            adapter = StreamAdapter("xai", params.model)
+            
+            # Configure event processor from streaming options if provided
+            # In Pydantic v2, extra fields are in model_extra
+            extra_params = getattr(params, 'model_extra', {}) or getattr(params, 'kwargs', {})
+            streaming_options = extra_params.get("streaming_options")
+            if streaming_options and hasattr(streaming_options, "event_processor") and streaming_options.event_processor:
+                adapter.set_event_processor(streaming_options.event_processor, request_info.get('request_id'))
+            
+            await adapter.start_stream()
             
             try:
                 # Format messages for xAI chat
@@ -134,8 +142,13 @@ class XAIProvider(ProviderAdapter):
                     yield text
                     
             except Exception as e:
+                await adapter.complete_stream(error=e)
                 raise ErrorMapper.map_xai_error(e)
             finally:
+                # Complete stream if not already done
+                if not adapter._stream_completed:
+                    await adapter.complete_stream()
+                
                 # Log streaming metrics
                 metrics = adapter.get_metrics()
                 logger.debug(
@@ -159,9 +172,43 @@ class XAIProvider(ProviderAdapter):
         This implementation collects chunks and estimates usage based on the response.
         """
         with logger.track_request("stream_with_usage", params.model) as request_info:
-            # Initialize StreamAdapter
-            adapter = StreamAdapter("xai")
-            adapter.start_stream()
+            # Initialize StreamAdapter with model for aggregation
+            adapter = StreamAdapter("xai", params.model)
+            
+            # Configure event processor from streaming options if provided
+            # In Pydantic v2, extra fields are in model_extra
+            extra_params = getattr(params, 'model_extra', {}) or getattr(params, 'kwargs', {})
+            streaming_options = extra_params.get("streaming_options")
+            if streaming_options and hasattr(streaming_options, "event_processor") and streaming_options.event_processor:
+                adapter.set_event_processor(streaming_options.event_processor, request_info.get('request_id'))
+            
+            await adapter.start_stream()
+            
+            # Configure usage aggregation for xAI (no native streaming usage)
+            # Get streaming options from model_extra (Pydantic v2) or extra_params
+            extra_params = getattr(params, 'model_extra', {}) or getattr(params, 'extra_params', {}) or {}
+            streaming_options = extra_params.get("streaming_options")
+            if streaming_options:
+                from ...models.streaming import StreamingOptions
+                if isinstance(streaming_options, StreamingOptions):
+                    adapter.configure_usage_aggregation(
+                        enable=streaming_options.enable_usage_aggregation,
+                        messages=messages,
+                        aggregator_type=streaming_options.aggregator_type,
+                        prefer_tiktoken=streaming_options.prefer_tiktoken
+                    )
+                else:
+                    # Default: enable aggregation for xAI
+                    adapter.configure_usage_aggregation(
+                        enable=True,
+                        messages=messages
+                    )
+            else:
+                # Default: enable aggregation for xAI since it has no native usage
+                adapter.configure_usage_aggregation(
+                    enable=True,
+                    messages=messages
+                )
             
             try:
                 # Format messages for xAI chat
@@ -206,20 +253,32 @@ class XAIProvider(ProviderAdapter):
                     if isinstance(item, tuple) and item[0] is None and item[1] is not None:
                         usage = item[1]["usage"]
                         logger.log_usage(usage, params.model, request_info['request_id'])
+                        
+                        # Get final JSON if JSON handler was used
+                        final_json = None
+                        if adapter.json_handler:
+                            final_json = adapter.get_final_json()
+                        
                         yield (None, {
                             "usage": usage,
                             "model": params.model,
                             "provider": "xai",
                             "finish_reason": item[1].get("finish_reason"),
                             "cost_usd": None,
-                            "cost_breakdown": None
+                            "cost_breakdown": None,
+                            "final_json": final_json  # Include final JSON if available
                         })
                     else:
                         yield item
                 
             except Exception as e:
+                await adapter.complete_stream(error=e)
                 raise ErrorMapper.map_xai_error(e)
             finally:
+                # Complete stream if not already done
+                if not adapter._stream_completed:
+                    await adapter.complete_stream()
+                
                 # Log streaming metrics
                 metrics = adapter.get_metrics()
                 logger.debug(

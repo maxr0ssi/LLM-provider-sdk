@@ -6,6 +6,13 @@ from typing import AsyncGenerator, Dict, Any, Optional, Tuple, List
 
 from .adapter import StreamAdapter
 from .manager import EventManager
+from ..models.events import (
+    StreamStartEvent,
+    StreamDeltaEvent,
+    StreamUsageEvent,
+    StreamCompleteEvent,
+    StreamErrorEvent
+)
 
 
 class StreamingHelper:
@@ -27,15 +34,17 @@ class StreamingHelper:
         Returns:
             Tuple of (final_text, usage_data, streaming_metrics)
         """
-        adapter.start_stream()
+        await adapter.start_stream()
         chunks: List[str] = []
         usage_data = None
+        chunk_index = 0
         
         if events:
-            await events.emit_start({
-                "provider": adapter.provider,
-                "stream_start": True
-            })
+            await events.emit_start(StreamStartEvent(
+                provider=adapter.provider,
+                model=adapter.model,
+                request_id=adapter._request_id
+            ))
         
         try:
             async for event in stream:
@@ -45,10 +54,15 @@ class StreamingHelper:
                 
                 if text:
                     chunks.append(text)
-                    adapter.track_chunk(len(text))
+                    await adapter.track_chunk(len(text), text)
                     
                     if events:
-                        await events.emit_delta(delta)
+                        await events.emit_delta(StreamDeltaEvent(
+                            delta=delta,
+                            chunk_index=chunk_index,
+                            is_json=adapter.response_format and adapter.response_format.get("type") == "json_object"
+                        ))
+                    chunk_index += 1
                 
                 # Check for usage data
                 if adapter.should_emit_usage(event):
@@ -56,24 +70,36 @@ class StreamingHelper:
                     if extracted_usage:
                         usage_data = extracted_usage
                         if events:
-                            await events.emit_usage(usage_data)
+                            await events.emit_usage(StreamUsageEvent(
+                                usage=usage_data,
+                                is_estimated=False,
+                                confidence=1.0
+                            ))
             
             # Get final metrics
             metrics = adapter.get_metrics()
             final_text = ''.join(chunks)
             
+            # Complete the stream
+            await adapter.complete_stream(final_usage=usage_data)
+            
             if events:
-                await events.emit_complete({
-                    "provider": adapter.provider,
-                    "final_text": final_text,
-                    "metrics": metrics
-                })
+                await events.emit_complete(StreamCompleteEvent(
+                    total_chunks=chunk_index,
+                    duration_ms=metrics.get("duration_seconds", 0) * 1000,
+                    final_usage=usage_data
+                ))
             
             return final_text, usage_data, metrics
             
         except Exception as e:
+            await adapter.complete_stream(error=e)
             if events:
-                await events.emit_error(e)
+                await events.emit_error(StreamErrorEvent(
+                    error=e,
+                    error_type=type(e).__name__,
+                    is_retryable=adapter._is_retryable_error(e)
+                ))
             raise
     
     @staticmethod
@@ -92,12 +118,14 @@ class StreamingHelper:
         Yields:
             Text chunks from the stream
         """
-        adapter.start_stream()
+        await adapter.start_stream()
+        chunk_index = 0
         
-        await events.emit_start({
-            "provider": adapter.provider,
-            "stream_start": True
-        })
+        await events.emit_start(StreamStartEvent(
+            provider=adapter.provider,
+            model=adapter.model,
+            request_id=adapter._request_id
+        ))
         
         try:
             async for event in stream:
@@ -106,23 +134,40 @@ class StreamingHelper:
                 text = delta.get_text()
                 
                 if text:
-                    adapter.track_chunk(len(text))
-                    await events.emit_delta(delta)
+                    await adapter.track_chunk(len(text), text)
+                    await events.emit_delta(StreamDeltaEvent(
+                        delta=delta,
+                        chunk_index=chunk_index,
+                        is_json=adapter.response_format and adapter.response_format.get("type") == "json_object"
+                    ))
+                    chunk_index += 1
                     yield text
                 
                 # Check for usage data
                 if adapter.should_emit_usage(event):
                     extracted_usage = adapter.extract_usage(event)
                     if extracted_usage:
-                        await events.emit_usage(extracted_usage)
+                        await events.emit_usage(StreamUsageEvent(
+                            usage=extracted_usage,
+                            is_estimated=False,
+                            confidence=1.0
+                        ))
             
-            # Emit completion event with metrics
+            # Get metrics and complete
             metrics = adapter.get_metrics()
-            await events.emit_complete({
-                "provider": adapter.provider,
-                "metrics": metrics
-            })
+            await adapter.complete_stream()
+            
+            await events.emit_complete(StreamCompleteEvent(
+                total_chunks=chunk_index,
+                duration_ms=metrics.get("duration_seconds", 0) * 1000,
+                final_usage=None  # Usage was already emitted if available
+            ))
             
         except Exception as e:
-            await events.emit_error(e)
+            await adapter.complete_stream(error=e)
+            await events.emit_error(StreamErrorEvent(
+                error=e,
+                error_type=type(e).__name__,
+                is_retryable=adapter._is_retryable_error(e)
+            ))
             raise

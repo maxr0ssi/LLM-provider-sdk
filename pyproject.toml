@@ -40,6 +40,9 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
 ]
+tiktoken = [
+    "tiktoken>=0.5.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/steer-ai/steer-llm-sdk"
@@ -63,3 +66,6 @@ ignore = ["E501"]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]

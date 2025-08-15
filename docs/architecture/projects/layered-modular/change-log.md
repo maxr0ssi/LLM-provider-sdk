@@ -54,6 +54,20 @@
 - Phase 2 now at 30% completion
 
 ### 2025-08-15
+- Continued Phase 4: Streaming & Events
+  - ✅ Day 3-4: Usage Aggregator Implementation
+    - Created UsageAggregator base class and implementations
+    - TiktokenAggregator for accurate OpenAI token counting
+    - CharacterAggregator fallback with provider-specific ratios
+    - Integrated with StreamAdapter and xAI provider
+    - Added aggregator configuration to StreamingOptions
+    - Created 47 new tests for aggregator functionality
+    - Added tiktoken as optional dependency
+  - xAI now has accurate usage estimation instead of simple division
+  - All providers maintain backward compatibility
+  - Phase 4 now at 60% completion
+
+### 2025-08-15
 - Completed Phase 2: Capability Registry Hardening
 - ✅ Created policy helpers in `core/capabilities/policy.py`:
   - `map_max_tokens_field()` - Capability-driven parameter mapping
@@ -79,6 +93,18 @@
   - Fixed critical syntax errors in all provider adapters
   - Updated conformance tests to use correct mocking approach
   - All provider adapters now compile and import successfully
+- Started Phase 4: Streaming & Events
+  - ✅ Day 1-2: JSON Streaming Enhancement
+    - Created JsonStreamHandler with full JSON parsing support
+    - Handles nested objects, arrays, and streaming validation
+    - Performance: < 0.1ms for simple objects, < 0.3ms per chunk
+  - ✅ StreamAdapter Integration
+    - Added JSON awareness with opt-in handler
+    - Created StreamingOptions configuration model
+    - Updated client API to support streaming options
+  - ✅ Comprehensive Testing
+    - 53 new tests for JSON streaming functionality
+    - All tests passing, backward compatibility maintained
 
 ## Current Status Summary
 
