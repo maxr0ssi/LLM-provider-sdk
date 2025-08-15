@@ -9,6 +9,7 @@ from typing import Optional, Type, Dict, Any
 import httpx
 
 from .base import ProviderError
+from ..reliability.error_classifier import ErrorClassifier, ErrorCategory
 
 
 class ErrorMapper:
@@ -91,11 +92,16 @@ class ErrorMapper:
         Returns:
             ProviderError with appropriate metadata
         """
-        status_code = getattr(error, 'status_code', None)
-        retry_after = ErrorMapper.get_retry_after(error)
+        # Use ErrorClassifier for comprehensive classification
+        classification = ErrorClassifier.classify_error(error, "openai")
         
-        # Determine error message
-        if hasattr(error, 'message'):
+        status_code = getattr(error, 'status_code', None)
+        retry_after = classification.suggested_delay or ErrorMapper.get_retry_after(error)
+        
+        # Use classified user message or fallback
+        if classification.user_message:
+            message = f"OpenAI API error: {classification.user_message}"
+        elif hasattr(error, 'message'):
             message = f"OpenAI API error: {error.message}"
         else:
             message = f"OpenAI API error: {str(error)}"
@@ -108,11 +114,14 @@ class ErrorMapper:
             retry_after=retry_after
         )
         
-        # Add retryable flag
-        provider_error.is_retryable = ErrorMapper.is_retryable(error)
+        # Use classification for retryable flag
+        provider_error.is_retryable = classification.is_retryable
         
         # Add original error reference
         provider_error.original_error = error
+        
+        # Add error category as an attribute
+        provider_error.error_category = classification.category
         
         return provider_error
     
@@ -127,19 +136,26 @@ class ErrorMapper:
         Returns:
             ProviderError with appropriate metadata
         """
-        status_code = getattr(error, 'status_code', None)
-        retry_after = ErrorMapper.get_retry_after(error)
+        # Use ErrorClassifier for comprehensive classification
+        classification = ErrorClassifier.classify_error(error, "anthropic")
         
-        # Anthropic-specific error handling
-        error_type = type(error).__name__
-        if error_type == 'RateLimitError':
-            message = f"Anthropic rate limit exceeded: {str(error)}"
-            status_code = 429
-        elif error_type == 'AuthenticationError':
-            message = f"Anthropic authentication failed: {str(error)}"
-            status_code = 401
+        status_code = getattr(error, 'status_code', None)
+        retry_after = classification.suggested_delay or ErrorMapper.get_retry_after(error)
+        
+        # Use classified user message or fallback
+        if classification.user_message:
+            message = f"Anthropic API error: {classification.user_message}"
         else:
-            message = f"Anthropic API error: {str(error)}"
+            # Anthropic-specific error handling
+            error_type = type(error).__name__
+            if error_type == 'RateLimitError':
+                message = f"Anthropic rate limit exceeded: {str(error)}"
+                status_code = 429
+            elif error_type == 'AuthenticationError':
+                message = f"Anthropic authentication failed: {str(error)}"
+                status_code = 401
+            else:
+                message = f"Anthropic API error: {str(error)}"
         
         # Create ProviderError with metadata
         provider_error = ProviderError(
@@ -149,11 +165,14 @@ class ErrorMapper:
             retry_after=retry_after
         )
         
-        # Add retryable flag
-        provider_error.is_retryable = ErrorMapper.is_retryable(error)
+        # Use classification for retryable flag
+        provider_error.is_retryable = classification.is_retryable
         
         # Add original error reference
         provider_error.original_error = error
+        
+        # Add error category as an attribute
+        provider_error.error_category = classification.category
         
         return provider_error
     
@@ -168,10 +187,17 @@ class ErrorMapper:
         Returns:
             ProviderError with appropriate metadata
         """
-        status_code = getattr(error, 'status_code', None)
-        retry_after = ErrorMapper.get_retry_after(error)
+        # Use ErrorClassifier for comprehensive classification
+        classification = ErrorClassifier.classify_error(error, "xai")
         
-        message = f"xAI API error: {str(error)}"
+        status_code = getattr(error, 'status_code', None)
+        retry_after = classification.suggested_delay or ErrorMapper.get_retry_after(error)
+        
+        # Use classified user message or fallback
+        if classification.user_message:
+            message = f"xAI API error: {classification.user_message}"
+        else:
+            message = f"xAI API error: {str(error)}"
         
         # Create ProviderError with metadata
         provider_error = ProviderError(
@@ -181,11 +207,14 @@ class ErrorMapper:
             retry_after=retry_after
         )
         
-        # Add retryable flag
-        provider_error.is_retryable = ErrorMapper.is_retryable(error)
+        # Use classification for retryable flag
+        provider_error.is_retryable = classification.is_retryable
         
         # Add original error reference
         provider_error.original_error = error
+        
+        # Add error category as an attribute
+        provider_error.error_category = classification.category
         
         return provider_error
     
@@ -212,6 +241,11 @@ class ErrorMapper:
     @staticmethod
     def _categorize_error(error: ProviderError) -> str:
         """Categorize error for metrics/alerting."""
+        # Use error_category if available from ErrorClassifier
+        if hasattr(error, 'error_category'):
+            return error.error_category.value
+        
+        # Fallback to status code categorization
         if error.status_code:
             if error.status_code == 401:
                 return 'authentication'

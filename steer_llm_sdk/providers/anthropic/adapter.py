@@ -342,7 +342,7 @@ class AnthropicProvider(ProviderAdapter):
                     text = delta.get_text()
                     
                     if text:
-                        adapter.track_chunk(len(text))
+                        await adapter.track_chunk(len(text))
                         collected_chunks.append(text)
                         yield (text, None)
                     

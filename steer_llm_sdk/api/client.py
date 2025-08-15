@@ -1,6 +1,7 @@
 """Main client interface for Steer LLM SDK."""
 
 import asyncio
+import time
 from typing import Optional, List, Union, Dict, Any, Callable, Awaitable
 from ..core.routing import LLMRouter
 from ..models.conversation_types import ConversationMessage
@@ -13,13 +14,42 @@ from ..models.events import (
 )
 from ..streaming.manager import EventManager
 from ..streaming.processor import create_event_processor
+from ..observability import MetricsCollector, MetricsConfig, get_collector
+from ..observability.sinks import MetricsSink
 
 
 class SteerLLMClient:
     """High-level client for Steer LLM SDK."""
     
-    def __init__(self):
+    def __init__(
+        self,
+        metrics_collector: Optional[MetricsCollector] = None,
+        metrics_config: Optional[MetricsConfig] = None,
+        metrics_sinks: Optional[List[MetricsSink]] = None
+    ):
+        """
+        Initialize the client.
+        
+        Args:
+            metrics_collector: Optional metrics collector instance
+            metrics_config: Optional metrics configuration
+            metrics_sinks: Optional list of metrics sinks
+        """
         self.router = LLMRouter()
+        
+        # Set up metrics
+        if metrics_collector:
+            self.metrics_collector = metrics_collector
+        else:
+            # Use global collector or create one
+            self.metrics_collector = get_collector()
+            if metrics_config:
+                self.metrics_collector.config = metrics_config
+        
+        # Add any provided sinks
+        if metrics_sinks:
+            for sink in metrics_sinks:
+                self.metrics_collector.add_sink(sink)
     
     async def generate(
         self,
@@ -70,8 +100,27 @@ class SteerLLMClient:
             if max_tokens is not None:
                 params["max_tokens"] = max_tokens
         
-        response = await self.router.generate(messages, model_id, params)
-        return response
+        # Get provider from model config
+        from ..core.routing import get_config
+        config = get_config(model_id)
+        provider = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
+        
+        # Track metrics
+        async with self.metrics_collector.track_request(
+            provider=provider,
+            model=model_id,
+            method="generate"
+        ) as request_metrics:
+            response = await self.router.generate(messages, model_id, params)
+            
+            # Update metrics with usage data
+            if hasattr(response, 'usage') and response.usage:
+                request_metrics.prompt_tokens = getattr(response.usage, 'prompt_tokens', 0)
+                request_metrics.completion_tokens = getattr(response.usage, 'completion_tokens', 0)
+                request_metrics.total_tokens = getattr(response.usage, 'total_tokens', 0)
+                request_metrics.cached_tokens = getattr(response.usage, 'cached_tokens', 0)
+            
+            return response
     
     async def stream_with_usage(
         self,
@@ -166,51 +215,75 @@ class SteerLLMClient:
         # Pass streaming options to router
         params["streaming_options"] = streaming_options
         
+        # Get provider from model config
+        from ..core.routing import get_config
+        config = get_config(model)
+        provider = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
+        
         response_wrapper = StreamingResponseWithUsage()
         
-        async for item in self.router.generate_stream(messages, model, params, return_usage=True):
-            if isinstance(item, tuple):
-                # Provider returned (chunk, usage_data)
-                chunk, usage_data = item
-                if chunk is not None:
-                    response_wrapper.add_chunk(chunk)
-                if usage_data is not None:
-                    # Extract final JSON if available
-                    final_json = usage_data.pop("final_json", None)
-                    # Set usage data (without final_json)
-                    response_wrapper.set_usage(**usage_data)
-                    # Set final JSON if available
-                    if final_json is not None:
-                        response_wrapper.set_final_json(final_json)
-            else:
-                # Just a chunk
-                response_wrapper.add_chunk(item)
-        
-        # Handle JSON post-processing if enabled
-        if streaming_options.enable_json_stream_handler:
-            rf = params.get("response_format") if isinstance(params, dict) else None
-            if isinstance(rf, dict) and rf.get("type") == "json_object":
-                # Use the final JSON from the handler if available
-                final_json = response_wrapper.get_json()
-                if final_json is not None:
-                    # Replace chunks with the properly parsed JSON
-                    import json
-                    response_wrapper.chunks = [json.dumps(final_json)]
+        # Track metrics
+        async with self.metrics_collector.track_request(
+            provider=provider,
+            model=model,
+            method="stream"
+        ) as request_metrics:
+            # Track time to first token
+            first_chunk_time = None
+            
+            async for item in self.router.generate_stream(messages, model, params, True):
+                # Track time to first chunk
+                if first_chunk_time is None:
+                    first_chunk_time = time.time()
+                    request_metrics.time_to_first_token_ms = (first_chunk_time - request_metrics.timestamp) * 1000
+                
+                if isinstance(item, tuple):
+                    # Provider returned (chunk, usage_data)
+                    chunk, usage_data = item
+                    if chunk is not None:
+                        response_wrapper.add_chunk(chunk)
+                    if usage_data is not None:
+                        # Extract final JSON if available
+                        final_json = usage_data.pop("final_json", None)
+                        # Set usage data (without final_json)
+                        response_wrapper.set_usage(**usage_data)
+                        # Set final JSON if available
+                        if final_json is not None:
+                            response_wrapper.set_final_json(final_json)
+                        # Update metrics with usage
+                        request_metrics.prompt_tokens = usage_data.get('prompt_tokens', 0)
+                        request_metrics.completion_tokens = usage_data.get('completion_tokens', 0)
+                        request_metrics.total_tokens = usage_data.get('total_tokens', 0)
+                        request_metrics.cached_tokens = usage_data.get('cached_tokens', 0)
                 else:
-                    # Fallback to heuristic only if handler didn't provide JSON
-                    combined = response_wrapper.get_text()
-                    start = combined.rfind("{")
-                    end = combined.rfind("}")
-                    if start != -1 and end != -1 and end > start:
-                        candidate = combined[start:end+1]
-                        try:
-                            json.loads(candidate)
-                            response_wrapper.chunks = [candidate]
-                        except Exception:
-                            # If parsing fails, keep original chunks
-                            pass
+                    # Just a chunk
+                    response_wrapper.add_chunk(item)
+            
+            # Handle JSON post-processing if enabled
+            if streaming_options.enable_json_stream_handler:
+                rf = params.get("response_format") if isinstance(params, dict) else None
+                if isinstance(rf, dict) and rf.get("type") == "json_object":
+                    # Use the final JSON from the handler if available
+                    final_json = response_wrapper.get_json()
+                    if final_json is not None:
+                        # Replace chunks with the properly parsed JSON
+                        import json
+                        response_wrapper.chunks = [json.dumps(final_json)]
+                    else:
+                        # Fallback to heuristic only if handler didn't provide JSON
+                        combined = response_wrapper.get_text()
+                        start = combined.rfind("{")
+                        end = combined.rfind("}")
+                        if start != -1 and end != -1 and end > start:
+                            candidate = combined[start:end+1]
+                            try:
+                                json.loads(candidate)
+                                response_wrapper.chunks = [candidate]
+                            except Exception:
+                                # If parsing fails, keep original chunks
+                                pass
 
-        return response_wrapper
+            return response_wrapper
     
     async def stream(
         self,

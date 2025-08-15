@@ -254,7 +254,41 @@ All tests are green. Proceed to Phase 4 (Streaming & Events):
 - Event consistency (on_start/on_delta/on_usage/on_complete/on_error)
 - Metrics hooks for streaming performance
 
+### 2025-08-15: Phase 4-5 Follow-ups Complete
+
+#### Summary
+Completed all Phase 4-5 follow-up tasks to address minor issues and improvements identified during implementation.
+
+#### Changes Made
+1. **Streaming Contract**: Updated client to use positional args for router.generate_stream()
+2. **Async Consistency**: Added missing await calls in provider adapters
+3. **Retry Enhancements**: 
+   - Honor explicit is_retryable=True flag with short-circuit logic
+   - Expanded rate limit patterns (13 total patterns now)
+4. **Memory Management**: Made streaming state TTL configurable via environment
+5. **Test Fixes**: Updated aggregator accuracy tests and router unit tests
+
+#### Files Modified
+- `steer_llm_sdk/api/client.py`
+- `steer_llm_sdk/providers/anthropic/streaming.py`
+- `steer_llm_sdk/providers/anthropic/adapter.py` 
+- `steer_llm_sdk/reliability/enhanced_retry.py`
+- `steer_llm_sdk/reliability/error_classifier.py`
+- `steer_llm_sdk/reliability/streaming_retry.py`
+- `tests/unit/test_router.py`
+- `tests/test_aggregator_accuracy.py`
+
+#### Test Results
+- ✅ All aggregator accuracy tests passing
+- ✅ Backcompat tests verified
+- ✅ Router unit tests passing
+- ✅ Performance benchmarks show no regression
+
+#### Documentation
+- Created PHASE_4_5_FOLLOWUPS.md with comprehensive summary
+- Updated PHASE_TRACKER.md to reflect completion
+
 ---
 
 Last Updated: 2025-08-15
-Next Review: Complete final 6 test fixes, then begin Phase 4
+Next Review: Begin Phase 6 - Metrics & Documentation

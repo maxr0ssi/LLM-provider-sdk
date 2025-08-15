@@ -73,6 +73,34 @@ class StreamingOptions:
     capture_raw_events: bool = False
     """Capture raw provider events for debugging."""
     
+    # Reliability options
+    connection_timeout: float = 30.0
+    """Timeout (seconds) to establish a streaming connection."""
+    read_timeout: float = 300.0
+    """Timeout (seconds) between stream chunks before retrying."""
+    retry_on_connection_error: bool = True
+    """Whether to retry on connection errors in streaming."""
+    max_reconnect_attempts: int = 3
+    """Maximum reconnect attempts for a stream."""
+    partial_response_recovery: bool = True
+    """Whether to preserve partial responses for recovery."""
+    
+    # Reliability options
+    connection_timeout: float = 30.0
+    """Timeout for establishing streaming connection."""
+    
+    read_timeout: float = 300.0
+    """Timeout for reading chunks from stream."""
+    
+    retry_on_connection_error: bool = True
+    """Retry on connection errors."""
+    
+    max_reconnect_attempts: int = 3
+    """Maximum reconnection attempts."""
+    
+    partial_response_recovery: bool = True
+    """Enable partial response recovery on reconnection."""
+    
     def __post_init__(self):
         """Validate configuration after initialization."""
         if self.event_callbacks is None:

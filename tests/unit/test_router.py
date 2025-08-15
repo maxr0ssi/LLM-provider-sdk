@@ -234,6 +234,9 @@ class TestLLMRouter:
         status = router.get_provider_status()
         
         assert isinstance(status, dict)
-        assert status[ProviderType.OPENAI.value] is True
-        assert status[ProviderType.ANTHROPIC.value] is False
-        assert status[ProviderType.XAI.value] is False
+        assert isinstance(status[ProviderType.OPENAI.value], dict)
+        assert status[ProviderType.OPENAI.value]['available'] is True
+        assert isinstance(status[ProviderType.ANTHROPIC.value], dict)
+        assert status[ProviderType.ANTHROPIC.value]['available'] is False
+        assert isinstance(status[ProviderType.XAI.value], dict)
+        assert status[ProviderType.XAI.value]['available'] is False

@@ -1,5 +1,6 @@
 import os
-from typing import Any, AsyncGenerator, Dict, List, Union
+import uuid
+from typing import Any, AsyncGenerator, Dict, List, Union, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -9,6 +10,11 @@ from ...models.generation import GenerationParams, GenerationResponse, ProviderT
 from ...providers.anthropic.adapter import anthropic_provider
 from ...providers.openai.adapter import openai_provider
 from ...providers.xai.adapter import xai_provider
+from ...providers.base import ProviderError
+from ...reliability import (
+    EnhancedRetryManager, RetryPolicy, CircuitBreakerManager,
+    CircuitBreakerConfig, CircuitState, StreamingRetryManager, StreamingRetryConfig
+)
 from .selector import (
     calculate_cache_savings,
     calculate_cost,
@@ -31,6 +37,52 @@ class LLMRouter:
             ProviderType.ANTHROPIC: anthropic_provider,
             ProviderType.XAI: xai_provider,
         }
+        
+        # Initialize reliability components
+        self.retry_manager = EnhancedRetryManager(
+            default_policy=RetryPolicy(
+                max_attempts=3,
+                initial_delay=0.5,
+                backoff_factor=2.0,
+                max_delay=30.0,
+                respect_retry_after=True
+            )
+        )
+        
+        # Circuit breaker manager
+        self.circuit_manager = CircuitBreakerManager()
+        
+        # Streaming retry manager
+        self.streaming_retry_manager = StreamingRetryManager(self.retry_manager)
+        
+        # Create circuit breakers for each provider
+        self._init_circuit_breakers()
+    
+    def _init_circuit_breakers(self):
+        """Initialize circuit breakers for each provider."""
+        # Default circuit breaker config
+        default_config = CircuitBreakerConfig(
+            failure_threshold=5,
+            success_threshold=2,
+            timeout=60.0,
+            window_size=60.0
+        )
+        
+        # Create circuit breaker for each provider
+        for provider_type in self.providers:
+            self.circuit_manager.get_or_create(
+                provider_type.value,
+                default_config
+            )
+    
+    def _get_retry_policy(self, provider: str, params: Dict[str, Any]) -> RetryPolicy:
+        """Get retry policy for request."""
+        # Check if custom retry policy is provided
+        if 'retry_policy' in params:
+            return params['retry_policy']
+        
+        # Use default policy
+        return self.retry_manager.default_policy
     
     async def generate(self, 
                       messages: Union[str, List[ConversationMessage]], 
@@ -59,9 +111,36 @@ class LLMRouter:
                 detail=f"Provider {config.provider} not implemented"
             )
         
-        # Generate response
+        # Generate request ID for tracking and ensure in params
+        request_id = raw_params.get('request_id', str(uuid.uuid4()))
+        raw_params['request_id'] = request_id
+        provider_name = config.provider.value
+        
+        # Get circuit breaker and retry policy
+        circuit_breaker = self.circuit_manager.get(provider_name)
+        retry_policy = self._get_retry_policy(provider_name, raw_params)
+        
+        # Check if circuit breaker is enabled
+        circuit_breaker_enabled = raw_params.get('circuit_breaker_enabled', True)
+        
+        async def _generate_internal():
+            """Internal generation function for retry/circuit breaker."""
+            # Execute through circuit breaker if enabled
+            if circuit_breaker and circuit_breaker_enabled:
+                return await circuit_breaker.call(
+                    lambda: provider.generate(messages, params)
+                )
+            else:
+                return await provider.generate(messages, params)
+        
+        # Generate response with retry
         try:
-            response = await provider.generate(messages, params)
+            response = await self.retry_manager.execute_with_retry(
+                _generate_internal,
+                request_id=request_id,
+                provider=provider_name,
+                policy=retry_policy
+            )
             
             # Calculate exact cost if possible, fallback to estimated cost
             # Use the originally requested ID for capability/pricing lookup
@@ -104,7 +183,14 @@ class LLMRouter:
             
             return response
             
+        except ProviderError as e:
+            # Provider errors are already properly formatted
+            raise HTTPException(
+                status_code=e.status_code or 500,
+                detail=str(e)
+            )
         except Exception as e:
+            # Other errors
             raise HTTPException(
                 status_code=500,
                 detail=f"Generation failed: {str(e)}"
@@ -139,6 +225,11 @@ class LLMRouter:
                 detail=f"Model {llm_model_id} is not available"
             )
         
+        # Ensure request_id present and normalized for downstream
+        raw_params = dict(raw_params or {})
+        request_id = raw_params.get('request_id', str(uuid.uuid4()))
+        raw_params['request_id'] = request_id
+        
         # Normalize parameters
         params = normalize_params(raw_params, config)
         
@@ -150,31 +241,86 @@ class LLMRouter:
                 detail=f"Provider {config.provider} not implemented"
             )
         
-        # Generate streaming response
-        try:
+        # Generate request ID if not provided
+        request_id = raw_params.get('request_id', str(uuid.uuid4()))
+        provider_name = config.provider.value
+        
+        # Get circuit breaker
+        circuit_breaker = self.circuit_manager.get(provider_name)
+        
+        # Create streaming config based on model/provider settings
+        streaming_config = StreamingRetryConfig(
+            max_connection_attempts=3,
+            connection_timeout=30.0,
+            read_timeout=300.0,  # 5 minutes for long responses
+            reconnect_on_error=True,
+            preserve_partial_response=True
+        )
+        
+        # Define the stream function for retry
+        async def create_stream():
+            # Check circuit breaker
+            if circuit_breaker and circuit_breaker.is_open():
+                raise ProviderError(
+                    f"Circuit breaker for {provider_name} is OPEN",
+                    provider=provider_name,
+                    status_code=503
+                )
+            
             if return_usage and hasattr(provider, 'generate_stream_with_usage'):
-                # Use the new method if available
-                async for item in provider.generate_stream_with_usage(messages, params):
-                    yield item
+                return provider.generate_stream_with_usage(messages, params)
             else:
-                # Fallback to regular streaming without usage data
-                async for chunk in provider.generate_stream(messages, params):
-                    if return_usage:
-                        yield (chunk, None)
-                    else:
-                        yield chunk
-                
+                return provider.generate_stream(messages, params)
+        
+        # Stream with retry logic
+        try:
+            async for item in self.streaming_retry_manager.stream_with_retry(
+                create_stream,
+                request_id=request_id,
+                provider=provider_name,
+                config=streaming_config
+            ):
+                if return_usage and not hasattr(provider, 'generate_stream_with_usage'):
+                    # Add None for usage if provider doesn't support it
+                    yield (item, None)
+                else:
+                    yield item
+                    
+        except ProviderError:
+            raise  # Re-raise provider errors
         except Exception as e:
             raise HTTPException(
                 status_code=500,
                 detail=f"Streaming generation failed: {str(e)}"
             )
     
-    def get_provider_status(self) -> Dict[str, bool]:
-        """Get availability status of all providers."""
+    def get_provider_status(self) -> Dict[str, Dict[str, Any]]:
+        """Get availability status of all providers including circuit breaker state."""
+        status = {}
+        for provider_type, provider in self.providers.items():
+            provider_name = provider_type.value
+            circuit_breaker = self.circuit_manager.get(provider_name)
+            
+            status[provider_name] = {
+                "available": provider.is_available(),
+                "circuit_breaker_state": circuit_breaker.get_state().value if circuit_breaker else "none",
+                "circuit_breaker_stats": {
+                    "failure_rate": circuit_breaker.stats.get_failure_rate() if circuit_breaker else 0,
+                    "consecutive_failures": circuit_breaker.stats.consecutive_failures if circuit_breaker else 0,
+                    "total_requests": circuit_breaker.stats.total_requests if circuit_breaker else 0
+                } if circuit_breaker else None
+            }
+        return status
+    
+    def get_retry_metrics(self) -> Dict[str, Any]:
+        """Get retry metrics."""
+        metrics = self.retry_manager.get_metrics()
         return {
-            provider_type.value: provider.is_available()
-            for provider_type, provider in self.providers.items()
+            "retry_attempts": metrics.retry_attempts,
+            "retry_successes": metrics.retry_successes,
+            "retry_failures": metrics.retry_failures,
+            "error_counts": {k.value: v for k, v in metrics.error_counts.items()},
+            "total_retry_delay": metrics.total_retry_delay
         }
 
 
@@ -259,6 +405,17 @@ async def get_model_hyperparameters(llm_model_id: str = None):
                 "default": get_default_hyperparameters(),
                 "by_provider": PROVIDER_HYPERPARAMETERS
             }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/reliability/metrics")
+async def get_reliability_metrics():
+    """Get reliability metrics including retry and circuit breaker stats."""
+    try:
+        return {
+            "retry_metrics": llm_router.get_retry_metrics(),
+            "circuit_breakers": llm_router.circuit_manager.get_all_stats()
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
