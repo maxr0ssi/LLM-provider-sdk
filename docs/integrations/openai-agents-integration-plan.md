@@ -1,4 +1,4 @@
-## Optional Integration Plan: OpenAI Agents SDK
+## Core Integration Plan: OpenAI Agents SDK Runtime
 
 ### Objective
 Provide an optional adapter to leverage the OpenAI Agents SDK for OpenAI models (GPT‑4.1 mini, GPT‑5 mini) while keeping this SDK provider‑agnostic and free of vendor‑specific runtime semantics.
@@ -8,17 +8,15 @@ References:
 - OpenAI Agents SDK – Context management: [openai.github.io/openai-agents-python/context/](https://openai.github.io/openai-agents-python/context/)
 
 ### Scope
-- In scope: a thin adapter that maps our agent primitives and callbacks to OpenAI Agents SDK constructs for OpenAI models only.
-- Out of scope: introducing `openai-agents` as a hard dependency of this SDK, or changing core provider‑agnostic behavior.
+- In scope: a core runtime adapter under `steer_llm_sdk/integrations/agents/openai/` that maps our agent primitives and callbacks to OpenAI Agents SDK constructs for OpenAI models.
+- Out of scope: embedding vendor‑specific semantics into non‑integration layers; keep the rest of core provider‑agnostic.
 
 ### Dependency strategy
-- Keep the core SDK as‑is. Do not add `openai-agents` to `requirements.txt`.
-- Offer as an optional dependency (consumer project installs it):
-  - `pip install openai-agents`
-  - Integration lives outside core SDK (recommended: main/orchestrator repo) or under an `integrations/` module that is not imported by default.
+- Ship the adapter in core; import lazily. If `openai-agents` is missing, raise a helpful error.
+- Provide an extras extra: `pip install steer-llm-sdk[openai-agents]` to pull `openai-agents`.
 
 ### High‑level design
-- Adapter module (example path for consumer): `integrations/openai_agents_adapter.py`
+- Adapter module (core path): `steer_llm_sdk/integrations/agents/openai/adapter.py`
 - Responsibilities:
   - Translate `AgentDefinition` → OpenAI `Agent` (instructions/system, model, tool specs).
   - Map `user_template`/variables → input text (and retain `instructions` mapping per `responses_use_instructions`).
@@ -114,7 +112,7 @@ async def run_with_openai_agents(defn: AgentDefinition, variables: dict, strict:
 - Offline: adapter unit tests for mapping logic.
 
 ### Rollout plan
-1) Draft adapter in consumer repo (`integrations/`), not in SDK core.
+1) Implement adapter in core integrations layer; lazy import dependency.
 2) Add examples and a short usage guide.
 3) Wire smoke tests behind OpenAI creds; keep optional in CI.
 4) Iterate based on usage and stability.
