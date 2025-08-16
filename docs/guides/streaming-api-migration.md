@@ -156,7 +156,6 @@ print(f"Cost for this conversation: ${response.cost_usd:.6f}")
 ## Deprecation Timeline
 
 - The `return_usage` parameter is deprecated as of v0.2.0
-- It will raise a deprecation warning in v0.3.0
-- It will be removed entirely in v0.4.0
+- It will be removed entirely in v0.3.0
 
 Please update your code to use the new API as soon as possible.
