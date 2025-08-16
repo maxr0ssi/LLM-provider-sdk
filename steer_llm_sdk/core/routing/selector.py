@@ -5,7 +5,6 @@ from ...models.generation import ModelConfig, GenerationParams, ProviderType
 from ...config.models import MODEL_CONFIGS as RAW_MODEL_CONFIGS, DEFAULT_MODEL, PROVIDER_HYPERPARAMETERS, DEFAULT_MODEL_HYPERPARAMETERS
 from ..capabilities.models import ProviderCapabilities, get_model_capabilities
 from .pricing_overrides import apply_pricing_overrides
-from ..pricing.legacy import get_legacy_blended_pricing
 
 
 # Convert raw configs to Pydantic models
@@ -158,11 +157,6 @@ def calculate_cost(usage: Dict[str, int], config: ModelConfig) -> Optional[float
         input_cost = (prompt_tokens / 1000) * config.input_cost_per_1k_tokens
         output_cost = (completion_tokens / 1000) * config.output_cost_per_1k_tokens
         return input_cost + output_cost
-    
-    # Fallback: blended single-rate pricing if available (legacy tests)
-    legacy_cost = get_legacy_blended_pricing(config, usage)
-    if legacy_cost is not None:
-        return legacy_cost
     
     # Additional fallback for cost_per_1k_tokens attribute
     if hasattr(config, 'cost_per_1k_tokens') and getattr(config, 'cost_per_1k_tokens'):

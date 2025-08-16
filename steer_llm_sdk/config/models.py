@@ -65,7 +65,6 @@ MODEL_CONFIGS = {
         "enabled": True,
         "input_cost_per_1k_tokens": 0.0005,   # $0.50 per 1M = $0.0005 per 1K
         "output_cost_per_1k_tokens": 0.0015,   # $1.50 per 1M = $0.0015 per 1K
-        "cost_per_1k_tokens": 0.001  # Legacy blended rate for backward compatibility
     },
     "claude-3-haiku": {
         "name": "Claude 3 Haiku",

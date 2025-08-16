@@ -159,6 +159,9 @@ Thumbs.db
 *.swp
 *~
 
+# Archive directories
+**/archive/
+
 # Test outputs
 test_*.py
 run_tests.py

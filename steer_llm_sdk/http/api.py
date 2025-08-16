@@ -33,7 +33,7 @@ async def llm_generate(
     llm_model_id: str = "GPT-4o Mini",
     params: Dict[str, Any] = None
 ):
-    """Direct LLM generation endpoint (for testing) - backward compatible."""
+    """Direct LLM generation endpoint (for testing)."""
     try:
         if params is None:
             params = {}
@@ -62,7 +62,7 @@ async def llm_stream(
     llm_model_id: str = "GPT-4o Mini",
     params: Dict[str, Any] = None
 ):
-    """Stream LLM generation (for future real-time chat) - backward compatible."""
+    """Stream LLM generation (for future real-time chat)."""
     try:
         if params is None:
             params = {}
