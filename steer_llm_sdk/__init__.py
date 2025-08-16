@@ -14,7 +14,7 @@ Features:
 - Conversation support
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 from .api.client import SteerLLMClient, generate
 from .core.routing import (
@@ -27,7 +27,7 @@ from .core.routing import (
     is_model_available,
     normalize_params,
 )
-from .core.routing import router as llm_router
+# Router instance removed - create with SteerLLMClient instead
 from .models.conversation_types import ConversationMessage
 from .models.conversation_types import TurnRole as ConversationRole
 from .models.generation import (
@@ -45,7 +45,6 @@ __all__ = [
     
     # Router
     "LLMRouter",
-    "llm_router",
     
     # Registry functions
     "get_config",

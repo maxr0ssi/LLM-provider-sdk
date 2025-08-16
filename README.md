@@ -42,6 +42,25 @@ The SDK implements a layered architecture designed for scalability and maintaina
 - **Agent Layer**: Advanced agent capabilities with tool execution and structured outputs
 
 ## Overview
+
+### API Key Configuration (v0.3.1+)
+
+For improved security, API keys should be passed directly to the client instead of using environment variables:
+
+```python
+from steer_llm_sdk import SteerLLMClient
+
+# Recommended: Pass API keys directly
+client = SteerLLMClient(
+    openai_api_key="your-openai-key",
+    anthropic_api_key="your-anthropic-key", 
+    xai_api_key="your-xai-key"
+)
+
+# Backward compatible: Use environment variables
+# client = SteerLLMClient()  # Will read from OPENAI_API_KEY, etc.
+```
+
 ### Streaming API (Updated)
 
 We have split the streaming API to provide a clean, scalable contract:
@@ -180,29 +199,29 @@ By centralizing LLM interactions, we ensure:
 export GITHUB_TOKEN=your_github_personal_access_token
 
 # Install base SDK
-pip install steer-llm-sdk --index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.0/
+pip install steer-llm-sdk --index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.1/
 
 # Or add to requirements.txt
---index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.0/
+--index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.1/
 steer-llm-sdk[openai-agents,tiktoken]
 ```
 
 ### Install from Source (Development)
 ```bash
 # Install base SDK
-pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1
 
 # Install with OpenAI Agents SDK support (for agent runtime features)
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0#egg=steer-llm-sdk[openai-agents]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1#egg=steer-llm-sdk[openai-agents]"
 
 # Install with token counting support
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0#egg=steer-llm-sdk[tiktoken]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1#egg=steer-llm-sdk[tiktoken]"
 
 # Install with HTTP API endpoints (requires FastAPI)
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0#egg=steer-llm-sdk[http]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1#egg=steer-llm-sdk[http]"
 
 # Install with all optional dependencies
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
 ```
 
 ### Local Development
@@ -762,6 +781,10 @@ For issues and questions:
 - **[Metrics & Monitoring](docs/architecture/metrics.md)**: Observability setup
 
 ## Changelog
+
+### v0.3.1 (2025-08)
+- **Security**: API keys now passed directly to client instead of environment variables
+- Backward compatible with environment variables
 
 ### v0.3.0 (2025-08)
 - Agent infrastructure with OpenAI Agents SDK integration

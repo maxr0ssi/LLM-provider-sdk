@@ -27,9 +27,10 @@ logger = ProviderLogger("xai")
 class XAIProvider(ProviderAdapter):
     """xAI API provider with conversation support, using xai_sdk.AsyncClient"""
     
-    def __init__(self):
+    def __init__(self, api_key: Optional[str] = None):
         self._client: Optional[AsyncClient] = None
-        self._api_key = os.getenv("XAI_API_KEY")
+        # Use provided API key, fall back to environment variable
+        self._api_key = api_key or os.getenv("XAI_API_KEY")
     
     @property
     def client(self) -> AsyncClient:
@@ -46,8 +47,8 @@ class XAIProvider(ProviderAdapter):
         params: GenerationParams
     ) -> GenerationResponse:
         """Generate text using xAI API with conversation support."""
-        # Extract request_id from raw_params if available
-        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        # Extract request_id from metadata if available
+        request_id = params.metadata.get('request_id') if params.metadata else None
         
         with logger.track_request("generate", params.model, request_id=request_id) as request_info:
             try:
@@ -105,8 +106,8 @@ class XAIProvider(ProviderAdapter):
         params: GenerationParams
     ) -> AsyncGenerator[str, None]:
         """Generate text using xAI API with streaming support."""
-        # Extract request_id from raw_params if available
-        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        # Extract request_id from metadata if available
+        request_id = params.metadata.get('request_id') if params.metadata else None
         
         with logger.track_request("stream", params.model, request_id=request_id) as request_info:
             # Initialize StreamAdapter with model
@@ -177,8 +178,8 @@ class XAIProvider(ProviderAdapter):
         Note: xAI's streaming API may not provide usage data in the same way as OpenAI/Anthropic.
         This implementation collects chunks and estimates usage based on the response.
         """
-        # Extract request_id from raw_params if available
-        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        # Extract request_id from metadata if available
+        request_id = params.metadata.get('request_id') if params.metadata else None
         
         with logger.track_request("stream_with_usage", params.model, request_id=request_id) as request_info:
             # Initialize StreamAdapter with model for aggregation
@@ -304,5 +305,4 @@ class XAIProvider(ProviderAdapter):
         return bool(self._api_key)
 
 
-# Global instance
-xai_provider = XAIProvider()
+# Global instance removed - providers should be created with API keys

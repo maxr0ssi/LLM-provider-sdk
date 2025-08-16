@@ -2,8 +2,6 @@
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
-from fastapi import HTTPException
-
 from steer_llm_sdk.core.routing import LLMRouter
 from steer_llm_sdk.models.generation import (
     GenerationParams,
@@ -11,6 +9,7 @@ from steer_llm_sdk.models.generation import (
     ModelConfig,
     ProviderType
 )
+from steer_llm_sdk.providers.base import ProviderError
 from steer_llm_sdk.models.conversation_types import ConversationMessage, TurnRole as ConversationRole
 
 
@@ -20,10 +19,14 @@ class TestLLMRouter:
     @pytest.fixture
     def router(self, mock_provider):
         """Create a router instance with mocked providers."""
-        with patch('steer_llm_sdk.core.routing.router.openai_provider', mock_provider), \
-             patch('steer_llm_sdk.core.routing.router.anthropic_provider', mock_provider), \
-             patch('steer_llm_sdk.core.routing.router.xai_provider', mock_provider):
-            return LLMRouter()
+        with patch('steer_llm_sdk.core.routing.router.OpenAIProvider', Mock(return_value=mock_provider)), \
+             patch('steer_llm_sdk.core.routing.router.AnthropicProvider', Mock(return_value=mock_provider)), \
+             patch('steer_llm_sdk.core.routing.router.XAIProvider', Mock(return_value=mock_provider)):
+            return LLMRouter(
+                openai_api_key="test-key",
+                anthropic_api_key="test-key",
+                xai_api_key="test-key"
+            )
     
     @pytest.fixture
     def mock_provider(self):
@@ -126,15 +129,26 @@ class TestLLMRouter:
     @pytest.mark.asyncio
     async def test_generate_model_not_available(self, router):
         """Test generation when model is not available."""
-        with patch('steer_llm_sdk.core.routing.selector.get_config'), \
-             patch('steer_llm_sdk.core.routing.selector.check_lightweight_availability', return_value=False), \
+        # Mock the provider to return False for is_available
+        for provider in router.providers.values():
+            provider.is_available = Mock(return_value=False)
+            
+        with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config, \
              patch('os.getenv', return_value=None):
             
-            with pytest.raises(HTTPException) as exc_info:
+            mock_get_config.return_value = ModelConfig(
+                name="test",
+                display_name="Test",
+                provider=ProviderType.OPENAI,
+                llm_model_id="unavailable-model",
+                description="Test"
+            )
+            
+            with pytest.raises(ProviderError) as exc_info:
                 await router.generate("Test", "unavailable-model", {})
             
             assert exc_info.value.status_code == 400
-            assert "not available" in str(exc_info.value.detail)
+            assert "not available" in str(exc_info.value)
     
     @pytest.mark.asyncio
     async def test_generate_provider_not_implemented(self, router, mock_provider):
@@ -172,6 +186,7 @@ class TestLLMRouter:
         """Test generation when provider raises an error."""
         mock_provider = Mock()
         mock_provider.generate = AsyncMock(side_effect=Exception("Provider error"))
+        mock_provider.is_available = Mock(return_value=True)
         
         with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config, \
              patch('steer_llm_sdk.core.routing.selector.check_lightweight_availability', return_value=True), \
@@ -187,11 +202,11 @@ class TestLLMRouter:
             
             router.providers[ProviderType.OPENAI] = mock_provider
             
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(ProviderError) as exc_info:
                 await router.generate("Test", "test-model", {})
             
             assert exc_info.value.status_code == 500
-            assert "Generation failed" in str(exc_info.value.detail)
+            assert "Generation failed" in str(exc_info.value)
     
     @pytest.mark.asyncio
     async def test_generate_stream(self, router, mock_provider):

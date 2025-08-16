@@ -5,7 +5,34 @@ All notable changes to the Steer LLM SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
- ## [0.3.0] - 2025-08-13 (in progress)
+## [0.3.1] - 2025-08-16
+### Security
+- **BREAKING**: API keys are now passed directly to the `SteerLLMClient` constructor instead of being read from environment variables
+  - This improves security by ensuring the SDK repository contains no keys
+  - API keys can still fall back to environment variables for backward compatibility
+
+### Changed
+- Updated `SteerLLMClient` to accept `openai_api_key`, `anthropic_api_key`, and `xai_api_key` parameters
+- Modified all provider adapters to accept API keys in their constructors
+- Removed global provider instances - providers are now created with API keys
+- Updated router to check provider availability based on configured API keys
+
+### Example
+```python
+from steer_llm_sdk import SteerLLMClient
+
+# Pass API keys directly (recommended)
+client = SteerLLMClient(
+    openai_api_key="your-openai-key",
+    anthropic_api_key="your-anthropic-key",
+    xai_api_key="your-xai-key"
+)
+
+# Or still use environment variables (backward compatible)
+client = SteerLLMClient()  # Will read from OPENAI_API_KEY, etc.
+```
+
+## [0.3.0] - 2025-08-16
 ### Changed
 - Completed Phase 0.5 directory restructuring (2025-08-14)
   - Introduced new layered structure: `api/`, `core/`, `providers/`, `streaming/`, `reliability/`, `observability/`, `integrations/`

@@ -26,6 +26,9 @@ class SteerLLMClient:
     
     def __init__(
         self,
+        openai_api_key: Optional[str] = None,
+        anthropic_api_key: Optional[str] = None,
+        xai_api_key: Optional[str] = None,
         metrics_collector: Optional[MetricsCollector] = None,
         metrics_config: Optional[MetricsConfig] = None,
         metrics_sinks: Optional[List[MetricsSink]] = None
@@ -34,11 +37,19 @@ class SteerLLMClient:
         Initialize the client.
         
         Args:
+            openai_api_key: Optional OpenAI API key
+            anthropic_api_key: Optional Anthropic API key
+            xai_api_key: Optional xAI API key
             metrics_collector: Optional metrics collector instance
             metrics_config: Optional metrics configuration
             metrics_sinks: Optional list of metrics sinks
         """
-        self.router = LLMRouter()
+        # Initialize router with API keys
+        self.router = LLMRouter(
+            openai_api_key=openai_api_key,
+            anthropic_api_key=anthropic_api_key,
+            xai_api_key=xai_api_key
+        )
         
         # Set up metrics
         if metrics_collector:

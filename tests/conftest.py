@@ -2,8 +2,12 @@
 
 import pytest
 import os
+from dotenv import load_dotenv
 from unittest.mock import Mock, AsyncMock, patch
 from typing import Dict, Any, List
+
+# Load environment variables from .env file for tests
+load_dotenv()
 
 from steer_llm_sdk.models.generation import (
     GenerationParams,

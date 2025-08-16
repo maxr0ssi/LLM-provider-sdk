@@ -6,9 +6,9 @@ from typing import Any, AsyncGenerator, Dict, List, Union, Optional
 
 from ...models.conversation_types import ConversationMessage
 from ...models.generation import GenerationParams, GenerationResponse, ProviderType
-from ...providers.anthropic.adapter import anthropic_provider
-from ...providers.openai.adapter import openai_provider
-from ...providers.xai.adapter import xai_provider
+from ...providers.anthropic.adapter import AnthropicProvider
+from ...providers.openai.adapter import OpenAIProvider
+from ...providers.xai.adapter import XAIProvider
 from ...providers.base import ProviderError
 from ...reliability import (
     EnhancedRetryManager, RetryPolicy, CircuitBreakerManager,
@@ -18,7 +18,6 @@ from .selector import (
     calculate_cache_savings,
     calculate_cost,
     calculate_exact_cost,
-    check_lightweight_availability,
     get_available_models,
     get_config,
     get_default_hyperparameters,
@@ -30,11 +29,14 @@ from .selector import (
 class LLMRouter:
     """Router for LLM requests across different providers with conversation support."""
     
-    def __init__(self):
+    def __init__(self, openai_api_key: Optional[str] = None, 
+                 anthropic_api_key: Optional[str] = None,
+                 xai_api_key: Optional[str] = None):
+        # Initialize providers with API keys
         self.providers = {
-            ProviderType.OPENAI: openai_provider,
-            ProviderType.ANTHROPIC: anthropic_provider,
-            ProviderType.XAI: xai_provider,
+            ProviderType.OPENAI: OpenAIProvider(api_key=openai_api_key),
+            ProviderType.ANTHROPIC: AnthropicProvider(api_key=anthropic_api_key),
+            ProviderType.XAI: XAIProvider(api_key=xai_api_key),
         }
         
         # Initialize reliability components
@@ -88,14 +90,16 @@ class LLMRouter:
         # Get model configuration
         config = get_config(llm_model_id)
         
-        # Check availability
+        # Check availability - provider must have API key
         bypass = os.getenv("STEER_SDK_BYPASS_AVAILABILITY_CHECK") == "true"
-        if not bypass and not check_lightweight_availability(llm_model_id):
-            raise ProviderError(
-                f"Model {llm_model_id} is not available",
-                provider="system",
-                status_code=400
-            )
+        if not bypass:
+            provider = self.providers.get(config.provider)
+            if not provider or not provider.is_available():
+                raise ProviderError(
+                    f"Model {llm_model_id} is not available (no API key configured)",
+                    provider="system",
+                    status_code=400
+                )
         
         # Normalize parameters
         params = normalize_params(raw_params, config)
@@ -205,14 +209,16 @@ class LLMRouter:
         # Get model configuration
         config = get_config(llm_model_id)
         
-        # Check availability
+        # Check availability - provider must have API key
         bypass = os.getenv("STEER_SDK_BYPASS_AVAILABILITY_CHECK") == "true"
-        if not bypass and not check_lightweight_availability(llm_model_id):
-            raise ProviderError(
-                f"Model {llm_model_id} is not available",
-                provider="system",
-                status_code=400
-            )
+        if not bypass:
+            provider = self.providers.get(config.provider)
+            if not provider or not provider.is_available():
+                raise ProviderError(
+                    f"Model {llm_model_id} is not available (no API key configured)",
+                    provider="system",
+                    status_code=400
+                )
         
         # Ensure request_id present and normalized for downstream
         raw_params = dict(raw_params or {})

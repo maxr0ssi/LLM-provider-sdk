@@ -1,4 +1,4 @@
-# Release Checklist for v0.3.0
+# Release Checklist for v0.3.1
 
 ## Pre-Release Steps
 
@@ -40,7 +40,7 @@
 2. **Commit All Changes**
    ```bash
    git add -A
-   git commit -m "chore: prepare v0.3.0 release
+   git commit -m "chore: prepare v0.3.1 release
 
    - Agent infrastructure with OpenAI Agents SDK
    - Unified streaming architecture
@@ -52,22 +52,22 @@
 
 3. **Create Release Candidate Tag**
    ```bash
-   git tag -a v0.3.0-rc1 -m "Release candidate 1 for v0.3.0"
+   git tag -a v0.3.1-rc1 -m "Release candidate 1 for v0.3.1"
    git push origin agent-architecture
-   git push origin v0.3.0-rc1
+   git push origin v0.3.1-rc1
    ```
 
 4. **Test Installation**
    ```bash
    # Test from tag
-   pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0-rc1
+   pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1-rc1
    ```
 
 5. **Create Final Release**
    ```bash
    # If RC is good, tag final release
-   git tag -a v0.3.0 -m "Release v0.3.0 - Agent Infrastructure"
-   git push origin v0.3.0
+   git tag -a v0.3.1 -m "Release v0.3.1 - Agent Infrastructure"
+   git push origin v0.3.1
    ```
 
 ## Post-Release
@@ -77,7 +77,7 @@
    - Verify package published
 
 2. **Update Nexus/SteerQA**
-   - Update dependency to v0.3.0
+   - Update dependency to v0.3.1
    - Test integration
 
 3. **Announce Release**
@@ -89,10 +89,10 @@
 For private GitHub package:
 ```bash
 export GITHUB_TOKEN=your_token
-pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1
 ```
 
 With extras:
 ```bash
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
 ```

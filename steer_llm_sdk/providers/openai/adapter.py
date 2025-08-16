@@ -32,9 +32,10 @@ load_dotenv()
 class OpenAIProvider(ProviderAdapter):
     """OpenAI API provider with conversation support."""
     
-    def __init__(self):
+    def __init__(self, api_key: Optional[str] = None):
         self._client: Optional[AsyncOpenAI] = None
-        self._api_key = os.getenv("OPENAI_API_KEY")
+        # Use provided API key, fall back to environment variable
+        self._api_key = api_key or os.getenv("OPENAI_API_KEY")
         # Allow overriding default timeout via env variable (seconds)
         try:
             self._timeout: float = float(os.getenv("OPENAI_TIMEOUT", "60"))
@@ -531,5 +532,4 @@ class OpenAIProvider(ProviderAdapter):
         return bool(self._api_key)
 
 
-# Global instance
-openai_provider = OpenAIProvider()
+# Global instance removed - providers should be created with API keys
