@@ -40,10 +40,9 @@ class StreamingHelper:
         chunk_index = 0
         
         if events:
-            await events.emit_start(StreamStartEvent(
+            await events.emit_start(events.create_start_event(
                 provider=adapter.provider,
-                model=adapter.model,
-                request_id=adapter._request_id
+                model=adapter.model
             ))
         
         try:
@@ -57,7 +56,7 @@ class StreamingHelper:
                     await adapter.track_chunk(len(text), text)
                     
                     if events:
-                        await events.emit_delta(StreamDeltaEvent(
+                        await events.emit_delta(events.create_delta_event(
                             delta=delta,
                             chunk_index=chunk_index,
                             is_json=adapter.response_format and adapter.response_format.get("type") == "json_object"
@@ -70,7 +69,7 @@ class StreamingHelper:
                     if extracted_usage:
                         usage_data = extracted_usage
                         if events:
-                            await events.emit_usage(StreamUsageEvent(
+                            await events.emit_usage(events.create_usage_event(
                                 usage=usage_data,
                                 is_estimated=False,
                                 confidence=1.0
@@ -84,7 +83,7 @@ class StreamingHelper:
             await adapter.complete_stream(final_usage=usage_data)
             
             if events:
-                await events.emit_complete(StreamCompleteEvent(
+                await events.emit_complete(events.create_complete_event(
                     total_chunks=chunk_index,
                     duration_ms=metrics.get("duration_seconds", 0) * 1000,
                     final_usage=usage_data
@@ -95,7 +94,7 @@ class StreamingHelper:
         except Exception as e:
             await adapter.complete_stream(error=e)
             if events:
-                await events.emit_error(StreamErrorEvent(
+                await events.emit_error(events.create_error_event(
                     error=e,
                     error_type=type(e).__name__,
                     is_retryable=adapter._is_retryable_error(e)
@@ -121,10 +120,9 @@ class StreamingHelper:
         await adapter.start_stream()
         chunk_index = 0
         
-        await events.emit_start(StreamStartEvent(
+        await events.emit_start(events.create_start_event(
             provider=adapter.provider,
-            model=adapter.model,
-            request_id=adapter._request_id
+            model=adapter.model
         ))
         
         try:
@@ -135,7 +133,7 @@ class StreamingHelper:
                 
                 if text:
                     await adapter.track_chunk(len(text), text)
-                    await events.emit_delta(StreamDeltaEvent(
+                    await events.emit_delta(events.create_delta_event(
                         delta=delta,
                         chunk_index=chunk_index,
                         is_json=adapter.response_format and adapter.response_format.get("type") == "json_object"
@@ -147,7 +145,7 @@ class StreamingHelper:
                 if adapter.should_emit_usage(event):
                     extracted_usage = adapter.extract_usage(event)
                     if extracted_usage:
-                        await events.emit_usage(StreamUsageEvent(
+                        await events.emit_usage(events.create_usage_event(
                             usage=extracted_usage,
                             is_estimated=False,
                             confidence=1.0
@@ -157,7 +155,7 @@ class StreamingHelper:
             metrics = adapter.get_metrics()
             await adapter.complete_stream()
             
-            await events.emit_complete(StreamCompleteEvent(
+            await events.emit_complete(events.create_complete_event(
                 total_chunks=chunk_index,
                 duration_ms=metrics.get("duration_seconds", 0) * 1000,
                 final_usage=None  # Usage was already emitted if available
@@ -165,7 +163,7 @@ class StreamingHelper:
             
         except Exception as e:
             await adapter.complete_stream(error=e)
-            await events.emit_error(StreamErrorEvent(
+            await events.emit_error(events.create_error_event(
                 error=e,
                 error_type=type(e).__name__,
                 is_retryable=adapter._is_retryable_error(e)

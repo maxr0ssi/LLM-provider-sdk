@@ -1,7 +1,7 @@
 """
 Example: Streaming with Usage Data
 
-This example demonstrates how to use the new return_usage parameter
+This example demonstrates how to use the stream_with_usage method
 to get token usage and cost information from streaming responses.
 """
 
@@ -15,13 +15,12 @@ async def example_basic_streaming_with_usage():
     
     client = SteerLLMClient()
     
-    # Enable usage data collection with return_usage=True
-    response = await client.stream(
+    # Use stream_with_usage to get usage data
+    response = await client.stream_with_usage(
         messages="Write a haiku about Python programming",
         model="gpt-4o-mini",
         temperature=0.7,
-        max_tokens=100,
-        return_usage=True
+        max_tokens=100
     )
     
     # The response is now a StreamingResponseWithUsage object
@@ -80,12 +79,11 @@ async def example_conversation_with_usage():
         )
     ]
     
-    response = await client.stream(
+    response = await client.stream_with_usage(
         messages=messages,
         model="gpt-4o-mini",
         temperature=0.5,
-        max_tokens=150,
-        return_usage=True
+        max_tokens=150
     )
     
     print("Assistant response:")
@@ -112,12 +110,11 @@ async def example_cost_tracking():
     ]
     
     for i, prompt in enumerate(prompts, 1):
-        response = await client.stream(
+        response = await client.stream_with_usage(
             messages=prompt,
             model="gpt-4o-mini",
             temperature=0.5,
-            max_tokens=100,
-            return_usage=True
+            max_tokens=100
         )
         
         print(f"{i}. {prompt}")
@@ -141,12 +138,11 @@ async def example_iterate_chunks():
     
     client = SteerLLMClient()
     
-    response = await client.stream(
+    response = await client.stream_with_usage(
         messages="List 3 Python best practices",
         model="gpt-4o-mini",
         temperature=0.5,
-        max_tokens=100,
-        return_usage=True
+        max_tokens=100
     )
     
     # You can iterate over the chunks that were collected

@@ -34,7 +34,7 @@ export RESPECT_RETRY_AFTER=true
 
 ```python
 from steer_llm_sdk.reliability import EnhancedRetryManager, RetryPolicy
-from steer_llm_sdk.reliability.errors import ErrorCategory
+from steer_llm_sdk.reliability.error_classifier import ErrorCategory
 
 # Create custom retry policies per error type
 retry_manager = EnhancedRetryManager(

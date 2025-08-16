@@ -10,7 +10,10 @@ This layer handles:
 - Advanced retry policies
 """
 
-from .errors import AgentError, ProviderError, SchemaError, ToolError, TimeoutError
+# Error classes have been moved to their proper modules
+# Import ProviderError from providers.base
+# Import SchemaError from integrations.agents.errors
+# Legacy error imports removed - use specific imports as needed
 from .retry import RetryManager
 from .idempotency import IdempotencyManager
 from .budget import clamp_params_to_budget
@@ -24,11 +27,6 @@ from .streaming_retry import StreamingRetryManager, StreamingRetryConfig
 from .state import StreamState, ChunkMetadata, StreamStateManager
 
 __all__ = [
-    "AgentError",
-    "ProviderError", 
-    "SchemaError",
-    "ToolError",
-    "TimeoutError",
     "RetryManager",
     "IdempotencyManager",
     "clamp_params_to_budget",

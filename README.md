@@ -213,11 +213,10 @@ async for chunk in client.stream(
 ):
     print(chunk, end="")
 
-# Stream with usage data (NEW!)
-response = await client.stream(
+# Stream with usage data
+response = await client.stream_with_usage(
     "Explain Python in one sentence",
-    "gpt-4o-mini",
-    return_usage=True
+    "gpt-4o-mini"
 )
 print(f"Response: {response.get_text()}")
 print(f"Tokens used: {response.usage['total_tokens']}")

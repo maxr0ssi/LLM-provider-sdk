@@ -60,8 +60,8 @@ class OpenAIProvider(ProviderAdapter):
                       messages: Union[str, List[ConversationMessage]], 
                       params: GenerationParams) -> GenerationResponse:
         """Generate text using OpenAI API with conversation support."""
-        # Extract request_id from raw_params if available
-        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        # Extract request_id from metadata if available
+        request_id = params.metadata.get('request_id') if params.metadata else None
         
         with logger.track_request("generate", params.model, request_id=request_id) as request_info:
             try:
@@ -173,8 +173,8 @@ class OpenAIProvider(ProviderAdapter):
                             messages: Union[str, List[ConversationMessage]], 
                             params: GenerationParams) -> AsyncGenerator[str, None]:
         """Generate text using OpenAI API with streaming and conversation support."""
-        # Extract request_id from raw_params if available
-        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        # Extract request_id from metadata if available
+        request_id = params.metadata.get('request_id') if params.metadata else None
         
         with logger.track_request("stream", params.model, request_id=request_id) as request_info:
             # Initialize StreamAdapter
@@ -314,8 +314,8 @@ class OpenAIProvider(ProviderAdapter):
         Yields tuples of (chunk, usage_data) where usage_data is None except
         for the final yield which contains the complete usage information.
         """
-        # Extract request_id from raw_params if available
-        request_id = params.raw_params.get('request_id') if params.raw_params else None
+        # Extract request_id from metadata if available
+        request_id = params.metadata.get('request_id') if params.metadata else None
         
         with logger.track_request("stream_with_usage", params.model, request_id=request_id) as request_info:
             # Initialize StreamAdapter

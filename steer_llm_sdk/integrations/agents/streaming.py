@@ -99,10 +99,9 @@ class AgentStreamingBridge:
         """Handle stream start event."""
         await self.adapter.start_stream()
         
-        event = StreamStartEvent(
+        event = self.events.create_start_event(
             provider=self.provider,
             model=self.model,
-            request_id=self.request_id,
             metadata=metadata or {}
         )
         
@@ -132,12 +131,11 @@ class AgentStreamingBridge:
             self._collected_text.append(text)
         
         # Create event
-        event = StreamDeltaEvent(
-            provider=self.provider,
-            model=self.model,
-            request_id=self.request_id,
+        event = self.events.create_delta_event(
             delta=delta,
             chunk_index=self._chunk_count,
+            provider=self.provider,
+            model=self.model,
             is_json=is_json
         )
         
@@ -165,12 +163,11 @@ class AgentStreamingBridge:
         if is_estimated and self.adapter.usage_aggregator:
             confidence = self.adapter.usage_aggregator.get_confidence()
         
-        event = StreamUsageEvent(
-            provider=self.provider,
-            model=self.model,
-            request_id=self.request_id,
+        event = self.events.create_usage_event(
             usage=usage,
             is_estimated=is_estimated,
+            provider=self.provider,
+            model=self.model,
             confidence=confidence
         )
         
@@ -196,12 +193,11 @@ class AgentStreamingBridge:
             final_usage = self.adapter.usage_aggregator.get_usage()
             await self.on_usage(final_usage, is_estimated=True)
         
-        event = StreamCompleteEvent(
-            provider=self.provider,
-            model=self.model,
-            request_id=self.request_id,
+        event = self.events.create_complete_event(
             total_chunks=self._chunk_count,
             duration_ms=duration_ms,
+            provider=self.provider,
+            model=self.model,
             final_usage=final_usage,
             metadata=metadata or {}
         )
@@ -218,12 +214,11 @@ class AgentStreamingBridge:
             for term in ["timeout", "network", "connection", "server error"]
         )
         
-        event = StreamErrorEvent(
-            provider=self.provider,
-            model=self.model,
-            request_id=self.request_id,
+        event = self.events.create_error_event(
             error=error,
             error_type=type(error).__name__,
+            provider=self.provider,
+            model=self.model,
             is_retryable=is_retryable
         )
         

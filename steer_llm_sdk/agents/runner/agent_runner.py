@@ -6,20 +6,21 @@ import time
 from typing import Any, Dict, Optional, Union
 
 from ...core.capabilities import get_capabilities_for_model
-from ...core.routing import LLMRouter
-from ...reliability.errors import ProviderError
+from ...core.routing import LLMRouter, get_config
+from ...integrations.agents import AgentRunOptions, get_agent_runtime
 from ...observability import AgentMetrics, MetricsSink
+from ...observability.models import RequestMetrics, ReliabilityMetrics
+from ...providers.base import ProviderError
+from ...reliability.budget import clamp_params_to_budget
+from ...reliability.idempotency import IdempotencyManager
+from ...reliability.retry import RetryConfig, RetryManager
+from ...streaming.adapter import StreamAdapter
+from ...streaming.manager import EventManager
 from ..models.agent_definition import AgentDefinition
 from ..models.agent_options import AgentOptions
 from ..models.agent_result import AgentResult
-from ...reliability.retry import RetryConfig, RetryManager
 from ..validators.json_schema import validate_json_schema
 from .determinism import apply_deterministic_policy
-from ...streaming.manager import EventManager
-from ...reliability.idempotency import IdempotencyManager
-from ...streaming.adapter import StreamAdapter
-from ...reliability.budget import clamp_params_to_budget
-from ...integrations.agents import get_agent_runtime, AgentRunOptions
 
 
 class AgentRunner:
@@ -116,9 +117,14 @@ class AgentRunner:
 
                     if ms_budget is not None and (time.time() - start) * 1000 >= ms_budget:
                         break
+            except ProviderError as e:
+                await events.emit_error(e)
+                raise  # Re-raise provider errors as-is
             except Exception as e:
                 await events.emit_error(e)
-                raise ProviderError(str(e))
+                config = get_config(definition.model)
+                provider = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
+                raise ProviderError(str(e), provider=provider)
 
             text = "".join(collected)
             content: Any = text
@@ -145,20 +151,27 @@ class AgentRunner:
             # Metrics (best-effort)
             if self.metrics_sink:
                 usage = final_usage or {}
-                metrics = AgentMetrics(
-                    request_id=None,
-                    trace_id=opts.trace_id,
+                # Get provider from model config
+                config = get_config(definition.model)
+                # Create modern RequestMetrics
+                request_metrics = RequestMetrics(
+                    provider=config.provider.value if hasattr(config.provider, 'value') else str(config.provider),
                     model=definition.model,
-                    latency_ms=result.elapsed_ms,
-                    input_tokens=int(usage.get("prompt_tokens", 0)),
-                    output_tokens=int(usage.get("completion_tokens", 0)),
+                    request_id=None,
+                    duration_ms=float(result.elapsed_ms),
+                    prompt_tokens=int(usage.get("prompt_tokens", 0)),
+                    completion_tokens=int(usage.get("completion_tokens", 0)),
                     cached_tokens=int(usage.get("cache_info", {}).get("cached_tokens", 0)) if isinstance(usage.get("cache_info", {}), dict) else 0,
-                    retries=0,
-                    error_class=None,
-                    tools_used=[t.name for t in (definition.tools or [])],
+                    successful=True,
+                    error_type=None,
+                    method="agent.run"
                 )
+                # Convert to AgentMetrics for backward compatibility
+                agent_metrics = AgentMetrics.from_request_metrics(request_metrics)
+                agent_metrics.trace_id = opts.trace_id
+                agent_metrics.tools_used = [t.name for t in (definition.tools or [])]
                 try:
-                    await self.metrics_sink.record(metrics)
+                    await self.metrics_sink.record(agent_metrics)
                 except Exception:
                     pass
             if opts.idempotency_key:
@@ -173,8 +186,12 @@ class AgentRunner:
         async def _call_router():
             try:
                 return await self.router.generate(messages, definition.model, params)
+            except ProviderError:
+                raise  # Re-raise provider errors as-is
             except Exception as e:
-                raise ProviderError(str(e))
+                config = get_config(definition.model)
+                provider = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
+                raise ProviderError(str(e), provider=provider)
 
         retry_mgr = RetryManager()
         retry_cfg = RetryConfig(max_attempts=2, backoff_factor=2.0, retryable_errors=(ProviderError,))
@@ -201,20 +218,27 @@ class AgentRunner:
         )
         if self.metrics_sink:
             usage = response.usage or {}
-            metrics = AgentMetrics(
-                request_id=None,
-                trace_id=opts.trace_id,
+            # Get provider from model config
+            config = get_config(definition.model)
+            # Create modern RequestMetrics
+            request_metrics = RequestMetrics(
+                provider=config.provider.value if hasattr(config.provider, 'value') else str(config.provider),
                 model=definition.model,
-                latency_ms=result.elapsed_ms,
-                input_tokens=int(usage.get("prompt_tokens", 0)),
-                output_tokens=int(usage.get("completion_tokens", 0)),
+                request_id=None,
+                duration_ms=float(result.elapsed_ms),
+                prompt_tokens=int(usage.get("prompt_tokens", 0)),
+                completion_tokens=int(usage.get("completion_tokens", 0)),
                 cached_tokens=int(usage.get("cache_info", {}).get("cached_tokens", 0)) if isinstance(usage.get("cache_info", {}), dict) else 0,
-                retries=0,
-                error_class=None,
-                tools_used=[t.name for t in (definition.tools or [])],
+                successful=True,
+                error_type=None,
+                method="agent.run"
             )
+            # Convert to AgentMetrics for backward compatibility
+            agent_metrics = AgentMetrics.from_request_metrics(request_metrics)
+            agent_metrics.trace_id = opts.trace_id
+            agent_metrics.tools_used = [t.name for t in (definition.tools or [])]
             try:
-                await self.metrics_sink.record(metrics)
+                await self.metrics_sink.record(agent_metrics)
             except Exception:
                 pass
         if opts.idempotency_key:
@@ -332,22 +356,27 @@ class AgentRunner:
             # Record metrics
             if self.metrics_sink:
                 usage = result.usage or {}
-                metrics = AgentMetrics(
-                    request_id=run_options.request_id,
-                    trace_id=result.trace_id,
+                # Get provider from model config
+                config = get_config(definition.model)
+                # Create modern RequestMetrics
+                request_metrics = RequestMetrics(
+                    provider=config.provider.value if hasattr(config.provider, 'value') else str(config.provider),
                     model=definition.model,
-                    latency_ms=result.elapsed_ms,
-                    input_tokens=int(usage.get("prompt_tokens", 0)),
-                    output_tokens=int(usage.get("completion_tokens", 0)),
+                    request_id=run_options.request_id,
+                    duration_ms=float(result.elapsed_ms),
+                    prompt_tokens=int(usage.get("prompt_tokens", 0)),
+                    completion_tokens=int(usage.get("completion_tokens", 0)),
                     cached_tokens=int(usage.get("cache_info", {}).get("cached_tokens", 0)) if isinstance(usage.get("cache_info", {}), dict) else 0,
-                    retries=0,
-                    error_class=None,
-                    tools_used=[t.name for t in (definition.tools or [])],
-                    # Add runtime dimension
-                    agent_runtime=runtime_name
+                    successful=True,
+                    error_type=None,
+                    method=f"agent.run.{runtime_name}"
                 )
+                # Convert to AgentMetrics for backward compatibility
+                agent_metrics = AgentMetrics.from_request_metrics(request_metrics)
+                agent_metrics.trace_id = result.trace_id
+                agent_metrics.tools_used = [t.name for t in (definition.tools or [])]
                 try:
-                    await self.metrics_sink.record(metrics)
+                    await self.metrics_sink.record(agent_metrics)
                 except Exception:
                     pass
             
@@ -360,25 +389,31 @@ class AgentRunner:
         except Exception as e:
             # Record error metrics
             if self.metrics_sink:
-                metrics = AgentMetrics(
-                    request_id=run_options.request_id,
-                    trace_id=opts.trace_id,
+                # Get provider from model config
+                config = get_config(definition.model)
+                # Create modern RequestMetrics for error case
+                request_metrics = RequestMetrics(
+                    provider=config.provider.value if hasattr(config.provider, 'value') else str(config.provider),
                     model=definition.model,
-                    latency_ms=int((time.time() - start_time) * 1000),
-                    input_tokens=0,
-                    output_tokens=0,
+                    request_id=run_options.request_id,
+                    duration_ms=float((time.time() - start_time) * 1000),
+                    prompt_tokens=0,
+                    completion_tokens=0,
                     cached_tokens=0,
-                    retries=0,
-                    error_class=type(e).__name__,
-                    tools_used=[t.name for t in (definition.tools or [])],
-                    agent_runtime=runtime_name
+                    successful=False,
+                    error_type=type(e).__name__,
+                    method=f"agent.run.{runtime_name}"
                 )
+                # Convert to AgentMetrics for backward compatibility
+                agent_metrics = AgentMetrics.from_request_metrics(request_metrics)
+                agent_metrics.trace_id = opts.trace_id
+                agent_metrics.tools_used = [t.name for t in (definition.tools or [])]
                 try:
-                    await self.metrics_sink.record(metrics)
+                    await self.metrics_sink.record(agent_metrics)
                 except Exception:
                     pass
             
             # Re-raise as ProviderError
-            raise ProviderError(str(e))
+            raise ProviderError(str(e), provider=runtime_name)
 
 

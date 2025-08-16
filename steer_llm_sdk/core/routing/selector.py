@@ -5,6 +5,7 @@ from ...models.generation import ModelConfig, GenerationParams, ProviderType
 from ...config.models import MODEL_CONFIGS as RAW_MODEL_CONFIGS, DEFAULT_MODEL, PROVIDER_HYPERPARAMETERS, DEFAULT_MODEL_HYPERPARAMETERS
 from ..capabilities.models import ProviderCapabilities, get_model_capabilities
 from .pricing_overrides import apply_pricing_overrides
+from ..pricing.legacy import get_legacy_blended_pricing
 
 
 # Convert raw configs to Pydantic models
@@ -113,6 +114,12 @@ def normalize_params(raw_params: Dict, config: ModelConfig) -> GenerationParams:
         if key not in normalized and key not in ["max_tokens", "maxTokens", "topP", "frequencyPenalty", "presencePenalty"]:
             normalized[key] = value
     
+    # Ensure request_id is in metadata
+    if 'request_id' in raw_params:
+        if 'metadata' not in normalized:
+            normalized['metadata'] = {}
+        normalized['metadata']['request_id'] = raw_params['request_id']
+    
     return GenerationParams(**normalized)
 
 
@@ -153,6 +160,11 @@ def calculate_cost(usage: Dict[str, int], config: ModelConfig) -> Optional[float
         return input_cost + output_cost
     
     # Fallback: blended single-rate pricing if available (legacy tests)
+    legacy_cost = get_legacy_blended_pricing(config, usage)
+    if legacy_cost is not None:
+        return legacy_cost
+    
+    # Additional fallback for cost_per_1k_tokens attribute
     if hasattr(config, 'cost_per_1k_tokens') and getattr(config, 'cost_per_1k_tokens'):
         total = usage.get("total_tokens", prompt_tokens + completion_tokens)
         return (total / 1000) * getattr(config, 'cost_per_1k_tokens')

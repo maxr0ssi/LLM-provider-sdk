@@ -9,6 +9,8 @@
   - `guides/agent-runtime-integration.md` - **NEW: OpenAI Agents SDK usage guide**
   - `guides/agents-openai-responses.md`
   - `guides/chat-completions.md`
+  - `guides/streaming-api-migration.md` - **NEW: Migrate from return_usage to stream_with_usage**
+  - `pricing.md` - Model pricing and cost calculation
 - Integrations
   - OpenAI Agents SDK (Phase 7 - COMPLETE)
     - `integrations/openai-agents/overview.md` - Getting started with agents

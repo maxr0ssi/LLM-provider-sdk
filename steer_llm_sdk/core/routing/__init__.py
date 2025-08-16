@@ -7,26 +7,25 @@ This layer handles:
 - Provider availability checks
 """
 
-from .router import LLMRouter, router
+from .router import LLMRouter
 from .selector import (
-    get_config,
-    get_available_models,
-    is_model_available,
-    check_lightweight_availability,
-    normalize_params,
-    get_capabilities,
+    MODEL_CONFIGS,
+    calculate_cache_savings,
     calculate_cost,
     calculate_exact_cost,
-    calculate_cache_savings,
+    check_lightweight_availability,
+    get_available_models,
+    get_capabilities,
+    get_config,
     get_default_hyperparameters,
-    MODEL_CONFIGS
+    is_model_available,
+    normalize_params,
 )
 
 __all__ = [
     "LLMRouter",
-    "router",
     "get_config",
-    "get_available_models", 
+    "get_available_models",
     "is_model_available",
     "check_lightweight_availability",
     "normalize_params",

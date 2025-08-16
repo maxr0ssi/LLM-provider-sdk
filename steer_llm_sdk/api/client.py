@@ -5,6 +5,7 @@ import time
 from typing import Optional, List, Union, Dict, Any, Callable, Awaitable
 from ..core.routing import LLMRouter
 from ..models.conversation_types import ConversationMessage
+from ..models.generation import GenerationResponse
 from ..models.events import (
     StreamStartEvent,
     StreamDeltaEvent,
@@ -60,7 +61,7 @@ class SteerLLMClient:
         max_tokens: int = None,
         raw_params: Dict[str, Any] = None,
         **kwargs
-    ) -> str:
+    ) -> GenerationResponse:
         """Generate text using specified model.
         
         Args:
@@ -71,6 +72,9 @@ class SteerLLMClient:
             max_tokens: Maximum tokens to generate
             raw_params: Dictionary of all parameters (takes precedence)
             **kwargs: Additional parameters
+            
+        Returns:
+            GenerationResponse: Response object containing text, usage, cost info, etc.
         """
         # Determine model ID (llm_model_id takes precedence)
         model_id = llm_model_id or model or "GPT-4o Mini"
@@ -259,30 +263,10 @@ class SteerLLMClient:
                     # Just a chunk
                     response_wrapper.add_chunk(item)
             
-            # Handle JSON post-processing if enabled
-            if streaming_options.enable_json_stream_handler:
-                rf = params.get("response_format") if isinstance(params, dict) else None
-                if isinstance(rf, dict) and rf.get("type") == "json_object":
-                    # Use the final JSON from the handler if available
-                    final_json = response_wrapper.get_json()
-                    if final_json is not None:
-                        # Replace chunks with the properly parsed JSON
-                        import json
-                        response_wrapper.chunks = [json.dumps(final_json)]
-                    else:
-                        # Fallback to heuristic only if handler didn't provide JSON
-                        combined = response_wrapper.get_text()
-                        start = combined.rfind("{")
-                        end = combined.rfind("}")
-                        if start != -1 and end != -1 and end > start:
-                            candidate = combined[start:end+1]
-                            try:
-                                json.loads(candidate)
-                                response_wrapper.chunks = [candidate]
-                            except Exception:
-                                # If parsing fails, keep original chunks
-                                pass
-
+            # JSON handling is done by the streaming adapter
+            # The final JSON is already available via response_wrapper.get_json()
+            # No need for post-processing here
+            
             return response_wrapper
     
     async def stream(

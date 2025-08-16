@@ -7,27 +7,8 @@ errors to our normalized error types.
 from typing import Optional, Dict, Any
 import re
 
-from ...reliability.errors import ProviderError as BaseProviderError
+from ...providers.base import ProviderError
 from ...reliability.error_classifier import ErrorCategory
-
-
-class ProviderError(BaseProviderError):
-    """Extended provider error with metadata."""
-    
-    def __init__(
-        self,
-        message: str,
-        provider: str = "unknown",
-        status_code: int = 500,
-        retry_after: Optional[int] = None
-    ):
-        super().__init__(message)
-        self.provider = provider
-        self.status_code = status_code
-        self.retry_after = retry_after
-        self.is_retryable = False
-        self.error_category = None
-        self.original_error_type = None
 
 
 class SchemaError(ProviderError):

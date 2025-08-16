@@ -333,15 +333,3 @@ class EnhancedRetryManager:
     def reset_metrics(self):
         """Reset metrics."""
         self.metrics = RetryMetrics()
-    
-    async def execute_with_retry_legacy(
-        self,
-        func: Callable,
-        config: RetryConfig
-    ) -> Any:
-        """
-        Legacy method for backward compatibility.
-        
-        Uses the base RetryManager for existing code.
-        """
-        return await self.base_retry_manager.execute_with_retry(func, config)
