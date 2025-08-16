@@ -146,8 +146,11 @@ pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer
 # Install with token counting support
 pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[tiktoken]"
 
+# Install with HTTP API endpoints (requires FastAPI)
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[http]"
+
 # Install with all optional dependencies
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[openai-agents,tiktoken]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
 
 # Or install a specific version/tag
 pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.2.1
@@ -341,6 +344,29 @@ export STEER_PRICING_OVERRIDES_FILE=/path/to/pricing.json
 - **Grok Beta** (`grok-beta`) - Early access model
 - **Grok 2** (`grok-2-1212`) - Latest production model
 - **Grok 3 Mini** (`grok-3-mini`) - Lightweight variant
+
+## HTTP API Endpoints (Optional)
+
+The SDK can optionally expose REST API endpoints using FastAPI:
+
+```python
+# Install with HTTP support
+# pip install steer-llm-sdk[http]
+
+from fastapi import FastAPI
+from steer_llm_sdk.http.api import router as llm_router
+
+app = FastAPI()
+app.include_router(llm_router, prefix="/api/v1")
+
+# Available endpoints:
+# POST /api/v1/generate - Generate text
+# POST /api/v1/stream - Stream text
+# GET /api/v1/model-catalog - List models
+# GET /api/v1/status - Check status
+```
+
+The SDK works perfectly without HTTP endpoints for notebooks, CLIs, and batch jobs. See the [HTTP Endpoints Guide](docs/guides/http-endpoints.md) for details.
 
 ## Advanced Features
 
