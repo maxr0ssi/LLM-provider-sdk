@@ -4,12 +4,16 @@ import time
 from ...models.generation import ModelConfig, GenerationParams, ProviderType
 from ...config.models import MODEL_CONFIGS as RAW_MODEL_CONFIGS, DEFAULT_MODEL, PROVIDER_HYPERPARAMETERS, DEFAULT_MODEL_HYPERPARAMETERS
 from ..capabilities.models import ProviderCapabilities, get_model_capabilities
+from .pricing_overrides import apply_pricing_overrides
 
 
 # Convert raw configs to Pydantic models
 MODEL_CONFIGS: Dict[str, ModelConfig] = {
     k: ModelConfig(**v) for k, v in RAW_MODEL_CONFIGS.items()
 }
+
+# Apply pricing overrides if configured
+apply_pricing_overrides(MODEL_CONFIGS)
 
 # Cache for model availability status
 _model_status_cache = {}
@@ -162,91 +166,55 @@ def calculate_exact_cost(usage: Dict[str, int], model_id: str) -> Optional[float
     prompt_tokens = usage.get("prompt_tokens", 0)
     completion_tokens = usage.get("completion_tokens", 0)
     
-    # Use model config pricing if available
+    # Use model config pricing
     if config.input_cost_per_1k_tokens and config.output_cost_per_1k_tokens:
         input_cost = (prompt_tokens / 1000) * config.input_cost_per_1k_tokens
         output_cost = (completion_tokens / 1000) * config.output_cost_per_1k_tokens
         return input_cost + output_cost
     
-    # Fall back to hardcoded values for legacy support
-    from ...config.constants import (
-        GPT4O_MINI_INPUT_COST_PER_1K,
-        GPT4O_MINI_OUTPUT_COST_PER_1K,
-        GPT41_NANO_INPUT_COST_PER_1K,
-        GPT41_NANO_OUTPUT_COST_PER_1K,
-        O4_MINI_INPUT_COST_PER_1K,
-        O4_MINI_OUTPUT_COST_PER_1K,
-        GPT41_MINI_INPUT_COST_PER_1K,
-        GPT41_MINI_OUTPUT_COST_PER_1K
-    )
+    # Temporary: Fall back to legacy blended pricing if available
+    if hasattr(config, 'cost_per_1k_tokens') and getattr(config, 'cost_per_1k_tokens'):
+        total_tokens = usage.get("total_tokens", prompt_tokens + completion_tokens)
+        return (total_tokens / 1000) * getattr(config, 'cost_per_1k_tokens')
     
-    if model_id == "gpt-4o-mini":
-        input_cost = (prompt_tokens / 1000) * GPT4O_MINI_INPUT_COST_PER_1K
-        output_cost = (completion_tokens / 1000) * GPT4O_MINI_OUTPUT_COST_PER_1K
-        return input_cost + output_cost
-    
-    elif model_id == "gpt-4.1-nano":
-        input_cost = (prompt_tokens / 1000) * GPT41_NANO_INPUT_COST_PER_1K
-        output_cost = (completion_tokens / 1000) * GPT41_NANO_OUTPUT_COST_PER_1K
-        return input_cost + output_cost
-    
-    elif model_id == "o4-mini":
-        input_cost = (prompt_tokens / 1000) * O4_MINI_INPUT_COST_PER_1K
-        output_cost = (completion_tokens / 1000) * O4_MINI_OUTPUT_COST_PER_1K
-        return input_cost + output_cost
-    
-    elif model_id == "gpt-4.1-mini":
-        input_cost = (prompt_tokens / 1000) * GPT41_MINI_INPUT_COST_PER_1K
-        output_cost = (completion_tokens / 1000) * GPT41_MINI_OUTPUT_COST_PER_1K
-        return input_cost + output_cost
-    
-    # For other models, fall back to blended default model pricing (gpt-4o-mini)
-    from ...config.constants import (
-        GPT4O_MINI_INPUT_COST_PER_1K,
-        GPT4O_MINI_OUTPUT_COST_PER_1K,
-    )
-    total_tokens = usage.get("total_tokens", prompt_tokens + completion_tokens)
-    blended_rate_per_1k = (GPT4O_MINI_INPUT_COST_PER_1K + GPT4O_MINI_OUTPUT_COST_PER_1K) / 2.0
-    return (total_tokens / 1000) * blended_rate_per_1k
+    # No pricing available
+    return None
 
 
 def calculate_cache_savings(usage: Dict[str, int], model_id: str) -> float:
     """Calculate exact cost savings from cache usage."""
-    from ...config.constants import (
-        GPT4O_MINI_INPUT_COST_PER_1K,
-        GPT41_NANO_INPUT_COST_PER_1K,
-        O4_MINI_INPUT_COST_PER_1K,
-        O4_MINI_CACHED_INPUT_COST_PER_1K,
-        GPT41_MINI_INPUT_COST_PER_1K,
-        GPT41_MINI_CACHED_INPUT_COST_PER_1K
-    )
-    
+    config = get_config(model_id)
     cache_info = usage.get("cache_info", {})
     
     # OpenAI cache savings (cached tokens are input tokens)
     if "cached_tokens" in cache_info:
         cached_tokens = cache_info["cached_tokens"]
-        if model_id == "gpt-4o-mini":
-            return (cached_tokens / 1000) * GPT4O_MINI_INPUT_COST_PER_1K
-        elif model_id == "gpt-4.1-nano":
-            return (cached_tokens / 1000) * GPT41_NANO_INPUT_COST_PER_1K
-        elif model_id == "o4-mini":
-            # For o4-mini, calculate the difference between regular and cached pricing
-            regular_cost = (cached_tokens / 1000) * O4_MINI_INPUT_COST_PER_1K
-            cached_cost = (cached_tokens / 1000) * O4_MINI_CACHED_INPUT_COST_PER_1K
+        
+        # If model has cached pricing, calculate the difference
+        if config.cached_input_cost_per_1k_tokens is not None and config.input_cost_per_1k_tokens:
+            regular_cost = (cached_tokens / 1000) * config.input_cost_per_1k_tokens
+            cached_cost = (cached_tokens / 1000) * config.cached_input_cost_per_1k_tokens
             return regular_cost - cached_cost
-        elif model_id == "gpt-4.1-mini":
-            # For gpt-4.1-mini, calculate the difference between regular and cached pricing
-            regular_cost = (cached_tokens / 1000) * GPT41_MINI_INPUT_COST_PER_1K
-            cached_cost = (cached_tokens / 1000) * GPT41_MINI_CACHED_INPUT_COST_PER_1K
-            return regular_cost - cached_cost
+        
+        # Otherwise, for models without explicit cached pricing, assume cached tokens are free
+        # (savings equal to the full input cost)
+        elif config.input_cost_per_1k_tokens:
+            return (cached_tokens / 1000) * config.input_cost_per_1k_tokens
     
     # Anthropic cache savings
     if "cache_read_tokens" in cache_info:
         cache_read_tokens = cache_info["cache_read_tokens"]
-        # Anthropic Haiku input cost is ~$0.0025 per 1K tokens (combined)
-        # Actual input cost is lower, estimate at $0.0005 per 1K
-        return (cache_read_tokens / 1000) * 0.0005
+        
+        # Use cached pricing if available
+        if config.cached_input_cost_per_1k_tokens is not None and config.input_cost_per_1k_tokens:
+            regular_cost = (cache_read_tokens / 1000) * config.input_cost_per_1k_tokens
+            cached_cost = (cache_read_tokens / 1000) * config.cached_input_cost_per_1k_tokens
+            return regular_cost - cached_cost
+        
+        # Otherwise estimate savings as a fraction of input cost
+        elif config.input_cost_per_1k_tokens:
+            # Anthropic typically charges ~10-25% for cached reads
+            return (cache_read_tokens / 1000) * config.input_cost_per_1k_tokens * 0.75
     
     return 0.0
 

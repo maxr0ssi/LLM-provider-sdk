@@ -35,11 +35,6 @@ REQUEST_SAMPLING_RATE=1.0
 DEFAULT_PROVIDER=openai
 DEFAULT_MODEL=gpt-4o-mini
 
-# Provider endpoints (optional)
-OPENAI_API_BASE=https://api.openai.com/v1
-ANTHROPIC_API_BASE=https://api.anthropic.com
-```
-
 ### Reliability Settings
 
 ```bash

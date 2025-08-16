@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, Dict, Any, List, Union
 from enum import Enum
 
@@ -84,6 +84,21 @@ class ModelConfig(BaseModel):
     cached_input_cost_per_1k_tokens: Optional[float] = None
     # Legacy blended pricing support for tests
     cost_per_1k_tokens: Optional[float] = None
+    
+    @model_validator(mode='after')
+    def validate_pricing(self):
+        """Validate that if one pricing field is set, both must be set."""
+        # Only enforce if we're setting exact pricing (not legacy)
+        has_input = self.input_cost_per_1k_tokens is not None
+        has_output = self.output_cost_per_1k_tokens is not None
+        
+        if has_input != has_output:
+            if has_input:
+                raise ValueError("If input_cost_per_1k_tokens is set, output_cost_per_1k_tokens must also be set")
+            else:
+                raise ValueError("If output_cost_per_1k_tokens is set, input_cost_per_1k_tokens must also be set")
+                
+        return self
 
 
 class GenerationRequest(BaseModel):

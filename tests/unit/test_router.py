@@ -50,17 +50,17 @@ class TestLLMRouter:
         """Test generation with simple string prompt."""
         with patch('steer_llm_sdk.core.routing.selector.get_config') as mock_get_config, \
              patch('steer_llm_sdk.core.routing.selector.check_lightweight_availability', return_value=True), \
-             patch('steer_llm_sdk.core.routing.selector.normalize_params') as mock_normalize, \
-             patch('steer_llm_sdk.core.routing.selector.calculate_cost', return_value=0.000015):
+             patch('steer_llm_sdk.core.routing.selector.normalize_params') as mock_normalize:
             
-            # Setup mocks
+            # Setup mocks with exact pricing
             mock_get_config.return_value = ModelConfig(
                 name="test",
                 display_name="Test",
                 provider=ProviderType.OPENAI,
                 llm_model_id="test-model",
                 description="Test",
-                cost_per_1k_tokens=0.001
+                input_cost_per_1k_tokens=0.001,
+                output_cost_per_1k_tokens=0.002
             )
             
             mock_normalize.return_value = GenerationParams(
@@ -79,9 +79,8 @@ class TestLLMRouter:
             )
             
             assert response.text == "Test response"
-            # Cost calculation uses actual default model cost
-            # 15 tokens * 0.000375 (gpt-4o-mini cost) / 1000
-            assert abs(response.cost_usd - 0.0000056) < 0.0000001
+            # Cost calculation: 10 prompt tokens * 0.001 + 5 completion tokens * 0.002 = 0.00002
+            assert response.cost_usd == 0.00002
             mock_provider.generate.assert_called_once()
             mock_get_config.assert_called_with("test-model")
     

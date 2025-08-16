@@ -150,25 +150,17 @@ class LLMRouter:
                 cache_savings = calculate_cache_savings(response.usage, llm_model_id)
                 response.cost_usd = exact_cost - cache_savings
                 
-                # Add cost breakdown for transparency
-                from ...config.constants import (
-                    GPT4O_MINI_INPUT_COST_PER_1K,
-                    GPT4O_MINI_OUTPUT_COST_PER_1K,
-                    GPT41_NANO_INPUT_COST_PER_1K,
-                    GPT41_NANO_OUTPUT_COST_PER_1K,
-                )
-                
+                # Add cost breakdown for transparency using model config
                 prompt_tokens = response.usage.get("prompt_tokens", 0)
                 completion_tokens = response.usage.get("completion_tokens", 0)
                 
-                if config.llm_model_id == "gpt-4o-mini":
-                    input_cost = (prompt_tokens / 1000) * GPT4O_MINI_INPUT_COST_PER_1K
-                    output_cost = (completion_tokens / 1000) * GPT4O_MINI_OUTPUT_COST_PER_1K
-                elif config.llm_model_id == "gpt-4.1-nano":
-                    input_cost = (prompt_tokens / 1000) * GPT41_NANO_INPUT_COST_PER_1K
-                    output_cost = (completion_tokens / 1000) * GPT41_NANO_OUTPUT_COST_PER_1K
+                # Calculate breakdown from model config pricing
+                if config.input_cost_per_1k_tokens and config.output_cost_per_1k_tokens:
+                    input_cost = (prompt_tokens / 1000) * config.input_cost_per_1k_tokens
+                    output_cost = (completion_tokens / 1000) * config.output_cost_per_1k_tokens
                 else:
-                    input_cost = exact_cost / 2  # Fallback approximation
+                    # Fallback approximation for legacy pricing
+                    input_cost = exact_cost / 2
                     output_cost = exact_cost / 2
                 
                 response.cost_breakdown = {
@@ -178,7 +170,7 @@ class LLMRouter:
                     "total_cost": exact_cost - cache_savings
                 }
                 
-            elif config.cost_per_1k_tokens:
+            elif hasattr(config, 'cost_per_1k_tokens') and getattr(config, 'cost_per_1k_tokens'):
                 response.cost_usd = calculate_cost(response.usage, config)
             
             return response

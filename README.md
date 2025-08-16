@@ -111,6 +111,7 @@ The Steer LLM SDK is the foundational AI integration layer for the Steer ecosyst
 - **Async Support**: Full async/await support for all operations
 - **Streaming**: Real-time streaming responses
 - **Conversation Management**: Native support for multi-turn conversations
+- **Agent Runtime**: Native OpenAI Agents SDK integration with tools and structured outputs
 
 ## Role in Steer Ecosystem
 
@@ -133,18 +134,23 @@ By centralizing LLM interactions, we ensure:
 ### Requirements
 - Python 3.10 or higher
 - API keys for the providers you want to use
-- OpenAI Agents SDK (for agent runtime): `pip install openai-agents`
 
 ### Install from GitHub (Recommended)
 ```bash
-# Install directly from GitHub
+# Install base SDK
 pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main
+
+# Install with OpenAI Agents SDK support (for agent runtime features)
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[openai-agents]"
+
+# Install with token counting support
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[tiktoken]"
+
+# Install with all optional dependencies
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[openai-agents,tiktoken]"
 
 # Or install a specific version/tag
 pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.2.1
-
-# Or install from a specific branch
-pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@agents
 ```
 
 ### Install from Source (Development)
@@ -252,7 +258,44 @@ for model_id, config in models.items():
     print(f"{model_id}: {config.description}")
     print(f"  Provider: {config.provider}")
     print(f"  Max tokens: {config.max_tokens}")
-    print(f"  Cost per 1k tokens: ${config.cost_per_1k_tokens}")
+    if config.input_cost_per_1k_tokens and config.output_cost_per_1k_tokens:
+        print(f"  Input cost: ${config.input_cost_per_1k_tokens}/1k tokens")
+        print(f"  Output cost: ${config.output_cost_per_1k_tokens}/1k tokens")
+```
+
+### Pricing Configuration
+
+Model pricing is configured in `steer_llm_sdk/config/models.py`. You can override pricing using:
+
+#### Environment Variable (JSON)
+```bash
+export STEER_PRICING_OVERRIDES_JSON='{
+  "gpt-4o-mini": {
+    "input_cost_per_1k_tokens": 0.00015,
+    "output_cost_per_1k_tokens": 0.0006
+  }
+}'
+```
+
+#### Configuration File
+```bash
+export STEER_PRICING_OVERRIDES_FILE=/path/to/pricing.json
+# Or place in ~/.steer/pricing_overrides.json
+```
+
+#### File Format
+```json
+{
+  "gpt-4o-mini": {
+    "input_cost_per_1k_tokens": 0.00015,
+    "output_cost_per_1k_tokens": 0.0006,
+    "cached_input_cost_per_1k_tokens": 0.000075
+  },
+  "gpt-5-mini": {
+    "input_cost_per_1k_tokens": 0.00025,
+    "output_cost_per_1k_tokens": 0.002
+  }
+}
 ```
 
 ## Supported Models
@@ -288,9 +331,12 @@ response = await client.generate(
 
 ### Cost Calculation
 
+The SDK automatically calculates costs based on token usage and model pricing:
+
 ```python
 response = await client.generate("Hello world", "gpt-4o-mini")
 print(f"Cost: ${response.cost_usd:.4f}")
+print(f"Cost breakdown: {response.cost_breakdown}")
 print(f"Tokens used: {response.usage}")
 ```
 
@@ -318,53 +364,144 @@ response = await llm_router.generate(
 )
 ```
 
-### Streaming with Usage Data (NEW!)
+### Streaming with Usage Data (new split API)
 
-The SDK now supports getting token usage and cost information from streaming responses:
+To capture usage and cost alongside streamed text, use the split API:
 
 ```python
 from steer_llm_sdk import SteerLLMClient
 
 client = SteerLLMClient()
 
-# Enable usage data collection with return_usage=True
-response = await client.stream(
+# Pure streaming (yields chunks)
+async for chunk in client.stream(
     messages="Write a Python function to calculate factorial",
     model="gpt-4o-mini",
     temperature=0.7,
     max_tokens=200,
-    return_usage=True  # New parameter!
+):
+    print(chunk, end="")
+
+# Streaming with usage summary (awaitable)
+response = await client.stream_with_usage(
+    messages="Write a Python function to calculate factorial",
+    model="gpt-4o-mini",
+    temperature=0.7,
+    max_tokens=200,
 )
 
-# Access the complete response text
-print("Generated code:")
+print("\nGenerated code:")
 print(response.get_text())
 
-# Access usage information
 print(f"\nToken usage:")
 print(f"  Prompt tokens: {response.usage['prompt_tokens']}")
 print(f"  Completion tokens: {response.usage['completion_tokens']}")
 print(f"  Total tokens: {response.usage['total_tokens']}")
 
-# Access cost information (when available)
 if response.cost_usd:
     print(f"\nEstimated cost: ${response.cost_usd:.6f}")
     if response.cost_breakdown:
         print(f"  Input cost: ${response.cost_breakdown['input_cost']:.6f}")
         print(f"  Output cost: ${response.cost_breakdown['output_cost']:.6f}")
-
-# You can also iterate over the collected chunks
-for i, chunk in enumerate(response.chunks):
-    print(f"Chunk {i}: {chunk}")
 ```
 
-**Backwards Compatibility**: The default behavior remains unchanged. When `return_usage=False` (default), the stream method yields string chunks as before:
+### Agent Runtime (OpenAI Agents SDK)
 
+The SDK now includes native support for the OpenAI Agents SDK, enabling advanced agent capabilities with tools and structured outputs. 
+
+**Installation**: Requires the `openai-agents` extra:
+```bash
+pip install "steer-llm-sdk[openai-agents]"
+```
+
+**Basic Agent Example**:
 ```python
-# Traditional streaming (unchanged)
-async for chunk in client.stream(messages="Hello", model="gpt-4o-mini"):
-    print(chunk, end="")
+from steer_llm_sdk.agents.models.agent_definition import AgentDefinition, Tool
+from steer_llm_sdk.agents.runner import AgentRunner
+
+# Define a tool
+def calculate_factorial(n: int) -> int:
+    """Calculate the factorial of a number."""
+    if n <= 1:
+        return 1
+    return n * calculate_factorial(n - 1)
+
+# Create agent definition
+definition = AgentDefinition(
+    system="You are a helpful math assistant.",
+    user_template="Calculate the factorial of {number}",
+    model="gpt-4",
+    tools=[
+        Tool(
+            name="factorial",
+            description="Calculate the factorial of a number",
+            parameters={
+                "type": "object",
+                "properties": {"n": {"type": "integer"}},
+                "required": ["n"]
+            },
+            handler=calculate_factorial
+        )
+    ]
+)
+
+# Run the agent
+runner = AgentRunner()
+result = await runner.run(
+    definition=definition,
+    variables={"number": 5},
+    options={"runtime": "openai_agents"}
+)
+
+print(result.content)  # "The factorial of 5 is 120"
 ```
+
+**Structured Output with JSON Schema**:
+```python
+from steer_llm_sdk.agents.models.agent_definition import AgentDefinition
+
+# Define agent with structured output
+definition = AgentDefinition(
+    system="Extract product information from the description.",
+    user_template="Product: {description}",
+    model="gpt-4",
+    json_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "price": {"type": "number"},
+            "category": {"type": "string"}
+        },
+        "required": ["name", "price", "category"],
+        "additionalProperties": False
+    }
+)
+
+# Run with strict JSON validation
+result = await runner.run(
+    definition=definition,
+    variables={"description": "iPhone 15 Pro, smartphone, $999"},
+    options={"runtime": "openai_agents", "strict": True}
+)
+
+print(result.final_json)  # {"name": "iPhone 15 Pro", "price": 999, "category": "smartphone"}
+```
+
+**Streaming Agent Responses**:
+```python
+# Stream agent responses with tools
+async for event in runner.stream(
+    definition=definition,
+    variables={"query": "Calculate 10!"},
+    options={"runtime": "openai_agents"}
+):
+    if event.type == "delta":
+        print(event.delta, end="")
+    elif event.type == "tool_call":
+        print(f"\n[Calling tool: {event.metadata['tool']}]")
+```
+
+For more details, see the [Agent Runtime Integration Guide](docs/guides/agent-runtime-integration.md).
 
 ## Architecture
 
@@ -433,10 +570,9 @@ ruff check steer_llm_sdk tests
 
 ### Client Methods
 
-- `generate(messages, model, **params)`: Generate text response
-- `stream(messages, model, return_usage=False, **params)`: Stream text response
-  - `return_usage=False` (default): Yields string chunks for backwards compatibility
-  - `return_usage=True`: Returns a `StreamingResponseWithUsage` object with usage data
+- `generate(messages, model, **params)`: Generate text response (returns object)
+- `stream(messages, model, **params)`: Stream text response (async generator yielding chunks)
+- `stream_with_usage(messages, model, **params)`: Awaitable streaming with usage summary
 - `get_available_models()`: Get all configured models
 - `check_model_availability(model_id)`: Check if model is available
 

@@ -44,7 +44,10 @@ setup(
             "pytest-cov>=4.0.0",
             "black>=23.0.0",
             "ruff>=0.1.0",
-        ]
+        ],
+        "openai-agents": [
+            "openai-agents>=0.1.0",
+        ],
     },
     entry_points={
         "console_scripts": [

@@ -10,7 +10,8 @@ MODEL_CONFIGS = {
         "temperature": 0.7,
         "enabled": True,
         "input_cost_per_1k_tokens": 0.00015,  # $0.15 per 1M = $0.00015 per 1K
-        "output_cost_per_1k_tokens": 0.0006   # $0.60 per 1M = $0.0006 per 1K
+        "output_cost_per_1k_tokens": 0.0006,   # $0.60 per 1M = $0.0006 per 1K
+        "cached_input_cost_per_1k_tokens": 0.000075  # $0.075 per 1M = $0.000075 per 1K
     },
     "gpt-4.1-nano": {
         "name": "GPT-4.1 Nano",
@@ -22,7 +23,8 @@ MODEL_CONFIGS = {
         "temperature": 0.7,
         "enabled": True,
         "input_cost_per_1k_tokens": 0.0001,   # $0.10 per 1M = $0.0001 per 1K
-        "output_cost_per_1k_tokens": 0.0004   # $0.40 per 1M = $0.0004 per 1K
+        "output_cost_per_1k_tokens": 0.0004,   # $0.40 per 1M = $0.0004 per 1K
+        "cached_input_cost_per_1k_tokens": 0.000025  # $0.025 per 1M = $0.000025 per 1K
     },
     "grok-3-mini": {
         "name": "Grok 3 Mini",
@@ -62,7 +64,8 @@ MODEL_CONFIGS = {
         "temperature": 0.7,
         "enabled": True,
         "input_cost_per_1k_tokens": 0.0005,   # $0.50 per 1M = $0.0005 per 1K
-        "output_cost_per_1k_tokens": 0.0015   # $1.50 per 1M = $0.0015 per 1K
+        "output_cost_per_1k_tokens": 0.0015,   # $1.50 per 1M = $0.0015 per 1K
+        "cost_per_1k_tokens": 0.001  # Legacy blended rate for backward compatibility
     },
     "claude-3-haiku": {
         "name": "Claude 3 Haiku",
@@ -118,6 +121,62 @@ MODEL_CONFIGS = {
         "input_cost_per_1k_tokens": 0.0004,   # $0.40 per 1M = $0.0004 per 1K
         "output_cost_per_1k_tokens": 0.0016,  # $1.60 per 1M = $0.0016 per 1K
         "cached_input_cost_per_1k_tokens": 0.0001  # $0.10 per 1M = $0.0001 per 1K
+    },
+    "gpt-5": {
+        "name": "GPT-5",
+        "display_name": "GPT-5",
+        "provider": "openai",
+        "llm_model_id": "gpt-5",
+        "description": "OpenAI's most advanced flagship model with superior reasoning capabilities",
+        "max_tokens": 32768,
+        "temperature": 0.7,
+        "enabled": True,
+        "context_length": 256000,  # 256K context window
+        "input_cost_per_1k_tokens": 0.00125,   # $1.25 per 1M = $0.00125 per 1K
+        "output_cost_per_1k_tokens": 0.01,     # $10.00 per 1M = $0.01 per 1K
+        "cached_input_cost_per_1k_tokens": 0.000125  # $0.125 per 1M = $0.000125 per 1K
+    },
+    "gpt-5-nano": {
+        "name": "GPT-5 Nano",
+        "display_name": "GPT-5 Nano",
+        "provider": "openai",
+        "llm_model_id": "gpt-5-nano",
+        "description": "Ultra-efficient nano version of GPT-5 for maximum cost optimization",
+        "max_tokens": 8192,
+        "temperature": 0.7,
+        "enabled": True,
+        "context_length": 128000,  # 128K context window
+        "input_cost_per_1k_tokens": 0.00005,   # $0.05 per 1M = $0.00005 per 1K
+        "output_cost_per_1k_tokens": 0.0004,   # $0.40 per 1M = $0.0004 per 1K
+        "cached_input_cost_per_1k_tokens": 0.000005  # $0.005 per 1M = $0.000005 per 1K
+    },
+    "gpt-4.1": {
+        "name": "GPT-4.1",
+        "display_name": "GPT-4.1",
+        "provider": "openai",
+        "llm_model_id": "gpt-4.1",
+        "description": "Enhanced GPT-4 with improved reasoning and larger context window",
+        "max_tokens": 16384,
+        "temperature": 0.7,
+        "enabled": True,
+        "context_length": 128000,  # 128K context window
+        "input_cost_per_1k_tokens": 0.002,    # $2.00 per 1M = $0.002 per 1K
+        "output_cost_per_1k_tokens": 0.008,   # $8.00 per 1M = $0.008 per 1K
+        "cached_input_cost_per_1k_tokens": 0.0005  # $0.50 per 1M = $0.0005 per 1K
+    },
+    "gpt-4o": {
+        "name": "GPT-4o",
+        "display_name": "GPT-4o",
+        "provider": "openai",
+        "llm_model_id": "gpt-4o",
+        "description": "Optimized GPT-4 with enhanced performance and efficiency",
+        "max_tokens": 16384,
+        "temperature": 0.7,
+        "enabled": True,
+        "context_length": 128000,  # 128K context window
+        "input_cost_per_1k_tokens": 0.0025,   # $2.50 per 1M = $0.0025 per 1K
+        "output_cost_per_1k_tokens": 0.01,    # $10.00 per 1M = $0.01 per 1K
+        "cached_input_cost_per_1k_tokens": 0.00125  # $1.25 per 1M = $0.00125 per 1K
     }
 }
 

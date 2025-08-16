@@ -1,90 +1,56 @@
 """
-LLM Constants
+LLM Pricing Metadata
 
-Central location for all LLM-related constants including pricing,
-budget management, and model configuration parameters.
+Central location for pricing metadata and documentation.
+All actual pricing values are now stored in model configurations.
 
-Pricing last verified against OpenAI public pricing pages as of 2025-08.
+See steer_llm_sdk/config/models.py for current pricing.
 """
 
 # Pricing metadata (for auditability)
 LAST_VERIFIED_PRICING_ISO = "2025-08-14"  # YYYY-MM-DD
+
+# Official pricing documentation sources
 PRICING_SOURCE_URLS = (
-    # Prefer the official pricing page(s). Update when OpenAI changes URLs.
+    # OpenAI pricing pages
     "https://platform.openai.com/pricing",
     "https://openai.com/api/pricing",
+    # Anthropic pricing
+    "https://www.anthropic.com/pricing", 
+    "https://docs.anthropic.com/en/docs/about-claude/models#model-comparison",
+    # XAI/Grok pricing
+    "https://docs.x.ai/api/pricing"
 )
 
-# GPT-4o-mini Pricing (per 1M tokens, as of 2025-08)
-GPT4O_MINI_INPUT_COST_PER_1M = 0.15  # $0.15 per 1M input tokens
-GPT4O_MINI_OUTPUT_COST_PER_1M = 0.60  # $0.60 per 1M output tokens
-GPT4O_MINI_INPUT_COST_PER_1K = GPT4O_MINI_INPUT_COST_PER_1M / 1000  # $0.00015 per 1K
-GPT4O_MINI_OUTPUT_COST_PER_1K = GPT4O_MINI_OUTPUT_COST_PER_1M / 1000  # $0.00060 per 1K
-# Cached input (prompt caching)
-GPT4O_MINI_CACHED_INPUT_COST_PER_1M = 0.075  # $0.075 per 1M cached input tokens
-GPT4O_MINI_CACHED_INPUT_COST_PER_1K = GPT4O_MINI_CACHED_INPUT_COST_PER_1M / 1000  # $0.000075 per 1K
+# Pricing update instructions
+PRICING_UPDATE_INSTRUCTIONS = """
+To update model pricing:
 
-# GPT-4.1 nano Pricing (per 1M tokens, as of 2025-08) - More cost effective!
-GPT41_NANO_INPUT_COST_PER_1M = 0.10  # $0.10 per 1M input tokens
-GPT41_NANO_OUTPUT_COST_PER_1M = 0.40  # $0.40 per 1M output tokens
-GPT41_NANO_INPUT_COST_PER_1K = GPT41_NANO_INPUT_COST_PER_1M / 1000  # $0.0001 per 1K
-GPT41_NANO_OUTPUT_COST_PER_1K = GPT41_NANO_OUTPUT_COST_PER_1M / 1000  # $0.0004 per 1K
-# Cached input (prompt caching)
-GPT41_NANO_CACHED_INPUT_COST_PER_1M = 0.025  # $0.025 per 1M cached input tokens
-GPT41_NANO_CACHED_INPUT_COST_PER_1K = GPT41_NANO_CACHED_INPUT_COST_PER_1M / 1000  # $0.000025 per 1K
+1. Check the official pricing sources listed in PRICING_SOURCE_URLS
+2. Update the pricing in steer_llm_sdk/config/models.py:
+   - input_cost_per_1k_tokens: Cost per 1,000 input tokens
+   - output_cost_per_1k_tokens: Cost per 1,000 output tokens
+   - cached_input_cost_per_1k_tokens: Cost per 1,000 cached input tokens (if applicable)
+3. Update LAST_VERIFIED_PRICING_ISO to today's date
+4. Run tests to ensure pricing calculations still work:
+   python -m pytest tests/unit/test_model_config_pricing.py
+   python -m pytest tests/unit/test_selector_cost.py
+"""
 
-# O4-mini Pricing (per 1M tokens, as of 2025-08)
-O4_MINI_INPUT_COST_PER_1M = 1.10  # $1.10 per 1M input tokens
-O4_MINI_OUTPUT_COST_PER_1M = 4.40  # $4.40 per 1M output tokens
-O4_MINI_CACHED_INPUT_COST_PER_1M = 0.275  # $0.275 per 1M cached input tokens
-O4_MINI_INPUT_COST_PER_1K = O4_MINI_INPUT_COST_PER_1M / 1000  # $0.0011 per 1K
-O4_MINI_OUTPUT_COST_PER_1K = O4_MINI_OUTPUT_COST_PER_1M / 1000  # $0.0044 per 1K
-O4_MINI_CACHED_INPUT_COST_PER_1K = O4_MINI_CACHED_INPUT_COST_PER_1M / 1000  # $0.000275 per 1K
+# Environment variable for pricing overrides
+PRICING_OVERRIDES_ENV_VAR = "STEER_PRICING_OVERRIDES_JSON"
 
-# GPT-4.1-mini Pricing (per 1M tokens, as of 2025-08)
-GPT41_MINI_INPUT_COST_PER_1M = 0.40  # $0.40 per 1M input tokens
-GPT41_MINI_OUTPUT_COST_PER_1M = 1.60  # $1.60 per 1M output tokens
-GPT41_MINI_CACHED_INPUT_COST_PER_1M = 0.10  # $0.10 per 1M cached input tokens
-GPT41_MINI_INPUT_COST_PER_1K = GPT41_MINI_INPUT_COST_PER_1M / 1000  # $0.0004 per 1K
-GPT41_MINI_OUTPUT_COST_PER_1K = GPT41_MINI_OUTPUT_COST_PER_1M / 1000  # $0.0016 per 1K
-GPT41_MINI_CACHED_INPUT_COST_PER_1K = GPT41_MINI_CACHED_INPUT_COST_PER_1M / 1000  # $0.0001 per 1K
-
-# GPT-5 mini Pricing (per 1M tokens, as of 2025-08)
-GPT5_MINI_INPUT_COST_PER_1M = 0.25  # $0.25 per 1M input tokens
-GPT5_MINI_OUTPUT_COST_PER_1M = 2.00  # $2.00 per 1M output tokens
-GPT5_MINI_CACHED_INPUT_COST_PER_1M = 0.025  # $0.025 per 1M cached input tokens
-GPT5_MINI_INPUT_COST_PER_1K = GPT5_MINI_INPUT_COST_PER_1M / 1000  # $0.00025 per 1K
-GPT5_MINI_OUTPUT_COST_PER_1K = GPT5_MINI_OUTPUT_COST_PER_1M / 1000  # $0.002 per 1K
-GPT5_MINI_CACHED_INPUT_COST_PER_1K = GPT5_MINI_CACHED_INPUT_COST_PER_1M / 1000  # $0.000025 per 1K
-
-# GPT-5 (flagship) Pricing (per 1M tokens, as of 2025-08)
-GPT5_INPUT_COST_PER_1M = 1.25  # $1.25 per 1M input tokens
-GPT5_OUTPUT_COST_PER_1M = 10.00  # $10.00 per 1M output tokens
-GPT5_CACHED_INPUT_COST_PER_1M = 0.125  # $0.125 per 1M cached input tokens
-GPT5_INPUT_COST_PER_1K = GPT5_INPUT_COST_PER_1M / 1000  # $0.00125 per 1K
-GPT5_OUTPUT_COST_PER_1K = GPT5_OUTPUT_COST_PER_1M / 1000  # $0.01 per 1K
-GPT5_CACHED_INPUT_COST_PER_1K = GPT5_CACHED_INPUT_COST_PER_1M / 1000  # $0.000125 per 1K
-
-# GPT-5 nano Pricing (per 1M tokens, as of 2025-08)
-GPT5_NANO_INPUT_COST_PER_1M = 0.05  # $0.05 per 1M input tokens
-GPT5_NANO_OUTPUT_COST_PER_1M = 0.40  # $0.40 per 1M output tokens
-GPT5_NANO_CACHED_INPUT_COST_PER_1M = 0.005  # $0.005 per 1M cached input tokens
-GPT5_NANO_INPUT_COST_PER_1K = GPT5_NANO_INPUT_COST_PER_1M / 1000  # $0.00005 per 1K
-GPT5_NANO_OUTPUT_COST_PER_1K = GPT5_NANO_OUTPUT_COST_PER_1M / 1000  # $0.0004 per 1K
-GPT5_NANO_CACHED_INPUT_COST_PER_1K = GPT5_NANO_CACHED_INPUT_COST_PER_1M / 1000  # $0.000005 per 1K
-
-# GPT-4.1 (flagship) Pricing (per 1M tokens, as of 2025-08)
-GPT41_INPUT_COST_PER_1M = 2.00  # $2.00 per 1M input tokens
-GPT41_OUTPUT_COST_PER_1M = 8.00  # $8.00 per 1M output tokens
-GPT41_CACHED_INPUT_COST_PER_1M = 0.50  # $0.50 per 1M cached input tokens
-GPT41_INPUT_COST_PER_1K = GPT41_INPUT_COST_PER_1M / 1000  # $0.002 per 1K
-GPT41_OUTPUT_COST_PER_1K = GPT41_OUTPUT_COST_PER_1M / 1000  # $0.008 per 1K
-GPT41_CACHED_INPUT_COST_PER_1K = GPT41_CACHED_INPUT_COST_PER_1M / 1000  # $0.0005 per 1K
-
-# GPT-4o (flagship) Pricing (per 1M tokens, as of 2025-08)
-GPT4O_INPUT_COST_PER_1M = 2.50  # $2.50 per 1M input tokens
-GPT4O_OUTPUT_COST_PER_1M = 10.00  # $10.00 per 1M output tokens
-GPT4O_CACHED_INPUT_COST_PER_1M = 1.25  # $1.25 per 1M cached input tokens
-GPT4O_INPUT_COST_PER_1K = GPT4O_INPUT_COST_PER_1M / 1000  # $0.0025 per 1K
-GPT4O_OUTPUT_COST_PER_1K = GPT4O_OUTPUT_COST_PER_1M / 1000  # $0.01 per 1K
-GPT4O_CACHED_INPUT_COST_PER_1K = GPT4O_CACHED_INPUT_COST_PER_1M / 1000  # $0.00125 per 1K
+# Example pricing override format
+PRICING_OVERRIDE_EXAMPLE = """
+{
+  "gpt-4o-mini": {
+    "input_cost_per_1k_tokens": 0.00015,
+    "output_cost_per_1k_tokens": 0.0006,
+    "cached_input_cost_per_1k_tokens": 0.000075
+  },
+  "gpt-5-mini": {
+    "input_cost_per_1k_tokens": 0.00025,
+    "output_cost_per_1k_tokens": 0.002
+  }
+}
+"""

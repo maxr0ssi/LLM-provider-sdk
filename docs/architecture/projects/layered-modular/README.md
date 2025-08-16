@@ -1,34 +1,50 @@
-## Layered Modular Redesign – Project Brief
+## Layered Modular Architecture – Project Overview
 
-### Objective
-Make the layered, provider‑agnostic architecture real across the SDK, enabling easy addition of providers, models, and optional provider‑native agent adapters without breaking backward compatibility.
+### Status: Phase 7 Complete ✅
+The layered-modular architecture refactoring has successfully completed through Phase 7 (Agent Runtime Integration) as of 2025-08-16.
 
-### Goals
-- Clear separation of layers per `docs/architecture/layered-modular-design.md`.
-- Normalized params, usage, streaming events across providers.
-- Capability‑driven behavior; no hard‑coded model branches.
-- Optional adapters for provider‑native agent systems (outside core).
-- Maintain current public API and pass all existing smoke tests.
+### Completed Phases
+- **Phase 0**: Base Models & Contracts ✅
+- **Phase 0.5**: Directory Restructuring ✅
+- **Phase 1**: Provider Adapter Normalization ✅
+- **Phase 2**: Capability & Policy Layer ✅
+- **Phase 3**: Decision & Routing Layer ✅
+- **Phase 4**: Streaming Unification ✅
+- **Phase 5**: Reliability & Observability ✅
+- **Phase 6**: Metrics & Telemetry ✅
+- **Phase 7**: Agent Runtime Integration (OpenAI Agents SDK) ✅
 
-### Deliverables
-- Architecture alignment edits (minimal, focused) with stable interfaces.
-- Completed capability registry for supported models.
-- Usage normalization and standardized on‑stream vs end‑stream usage emission.
-- Typed errors across providers; unified retry strategy.
-- Documentation and examples for users.
+### Architecture Overview
+The SDK now implements a clean layered architecture:
+- **API Layer**: Public client interface with backward compatibility
+- **Core Layers**: Provider-agnostic business logic
+  - Decision & Normalization
+  - Capability & Policy
+  - Routing
+- **Integration Layer**: Provider adapters and agent runtimes
+- **Support Layers**: Streaming, reliability, observability
 
-### Success criteria
-- All smoke tests pass; new tests added for normalization and capabilities.
-- Adding a new provider requires only: adapter + capability entries + tests.
-- Adding a new model requires only: capability entry + tests.
+### Key Achievements
+✅ Clear separation of concerns with no provider logic in core  
+✅ Capability-driven behavior (no model name branching)  
+✅ Unified streaming with event normalization  
+✅ Comprehensive error taxonomy and retry policies  
+✅ Native OpenAI Agents SDK integration  
+✅ Full backward compatibility maintained  
 
-### Read next
-- `architecture-plan.md` – target structure and contracts
-- `refactoring-plan.md` – phased work plan
-- `examples.md` – usage examples
-- `diagrams.md` – updated ASCII diagrams
-- `test-plan.md` – validation strategy
-- `migration.md` – compatibility and changes
-- `backlog.md` & `checklist.md` – task tracking
+### Active Documentation
+- `PHASE_TRACKER.md` – Current status and remaining work
+- `architecture-overview.md` – Visual architecture guide
+- `migration.md` – Guide for updating code
+- `completed-phases/` – Detailed summaries of each phase
+
+### Archive
+- `archive/old-planning/` – Historical planning documents
+- `archive/backlog.md` – Future enhancement ideas
+
+### Next Steps
+- **Phase 8**: Integration Testing & Validation
+- Consider additional agent runtime adapters
+- Performance optimization and benchmarking
 
 

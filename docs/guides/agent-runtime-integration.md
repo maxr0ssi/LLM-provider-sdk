@@ -293,17 +293,7 @@ result = await runner.run(
 # Metrics automatically recorded with agent_runtime dimension
 ```
 
-## Fallback to Router
 
-If no runtime is specified, the SDK uses the standard router path:
-
-```python
-# Uses standard router (no runtime)
-result = await runner.run(agent, variables, {})
-
-# Uses OpenAI Agents runtime
-result = await runner.run(agent, variables, {"runtime": "openai_agents"})
-```
 
 ## Model Support
 
