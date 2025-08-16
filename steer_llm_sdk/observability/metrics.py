@@ -16,6 +16,10 @@ class AgentMetrics:
     retries: int
     error_class: Optional[str]
     tools_used: List[str]
+    agent_runtime: Optional[str] = None  # Runtime used (e.g., 'openai_agents')
+    ttft_ms: Optional[int] = None  # Time to first token (streaming)
+    tools_invoked: int = 0  # Number of tool invocations
+    agent_loop_iters: int = 0  # Number of agent loop iterations
 
 
 class MetricsSink(Protocol):

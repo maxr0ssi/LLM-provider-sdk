@@ -9,6 +9,11 @@
   - `guides/chat-completions.md`
 - Integrations
   - `integrations/openai-agents-integration-plan.md`
+  - `integrations/openai-agents/overview.md`
+  - `integrations/openai-agents/technical-design.md`
+  - `integrations/openai-agents/implementation.md`
+  - `integrations/openai-agents/configuration.md`
+  - `integrations/openai-agents/diagrams/flows.md`
 - Reports
   - `reports/NEXUS_SDK_MVP_REPORT.md`
   - `reports/NEXUS_SDK_ARCHITECTURE.md`

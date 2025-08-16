@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
 
 from ...core.capabilities import get_capabilities_for_model
 from ...core.routing import LLMRouter
@@ -19,6 +19,7 @@ from ...streaming.manager import EventManager
 from ...reliability.idempotency import IdempotencyManager
 from ...streaming.adapter import StreamAdapter
 from ...reliability.budget import clamp_params_to_budget
+from ...integrations.agents import get_agent_runtime, AgentRunOptions
 
 
 class AgentRunner:
@@ -28,8 +29,21 @@ class AgentRunner:
         self.idempotency = IdempotencyManager()
         self.metrics_sink = metrics_sink
 
-    async def run(self, definition: AgentDefinition, variables: Dict[str, Any], options: Dict[str, Any] | AgentOptions) -> AgentResult:
+    async def run(self, definition: AgentDefinition, variables: Dict[str, Any], options: Union[Dict[str, Any], AgentOptions]) -> AgentResult:
         opts = options if isinstance(options, AgentOptions) else AgentOptions(**options)
+        
+        # Check if runtime is specified
+        runtime_name = None
+        if isinstance(options, dict):
+            runtime_name = options.get("runtime")
+        elif hasattr(opts, "runtime"):
+            runtime_name = opts.runtime
+        
+        # If runtime specified, delegate to runtime adapter
+        if runtime_name:
+            return await self._run_with_runtime(definition, variables, opts, runtime_name)
+        
+        # Otherwise, use existing router-based implementation
         caps = get_capabilities_for_model(definition.model)
 
         # Render user message (simple format; Jinja2 can be wired if needed)
@@ -206,5 +220,165 @@ class AgentRunner:
         if opts.idempotency_key:
             self.idempotency.store_result(opts.idempotency_key, result)
         return result
+    
+    async def _run_with_runtime(
+        self,
+        definition: AgentDefinition,
+        variables: Dict[str, Any],
+        opts: AgentOptions,
+        runtime_name: str
+    ) -> AgentResult:
+        """Run agent using specified runtime adapter."""
+        # Get runtime adapter
+        runtime = get_agent_runtime(runtime_name)
+        
+        # Convert AgentOptions to AgentRunOptions
+        run_options = AgentRunOptions(
+            runtime=runtime_name,
+            streaming=opts.streaming,
+            deterministic=opts.deterministic,
+            seed=opts.metadata.get("seed") if opts.metadata else None,
+            strict=opts.metadata.get("strict") if opts.metadata else None,
+            responses_use_instructions=opts.metadata.get("responses_use_instructions", False) if opts.metadata else False,
+            budget=dict(opts.budget) if opts.budget else None,
+            idempotency_key=opts.idempotency_key,
+            trace_id=opts.trace_id,
+            request_id=opts.metadata.get("request_id") if opts.metadata else None,
+            streaming_options=opts.metadata.get("streaming_options") if opts.metadata else None,
+            metadata=opts.metadata or {}
+        )
+        
+        # Check idempotency
+        if opts.idempotency_key:
+            cached = self.idempotency.check_duplicate(opts.idempotency_key)
+            if cached is not None:
+                return cached
+        
+        start_time = time.time()
+        
+        try:
+            # Prepare agent
+            prepared = await runtime.prepare(definition, run_options)
+            
+            if opts.streaming:
+                # Streaming mode
+                events = EventManager(
+                    on_start=opts.metadata.get("on_start"),
+                    on_delta=opts.metadata.get("on_delta"),
+                    on_usage=opts.metadata.get("on_usage"),
+                    on_complete=opts.metadata.get("on_complete"),
+                    on_error=opts.metadata.get("on_error"),
+                )
+                
+                # Create a result collector to aggregate streaming data
+                from ...integrations.agents.streaming import AgentStreamingBridge
+                result_collector = None
+                
+                # Run streaming (yields nothing, emits events)
+                async for _ in runtime.run_stream(prepared, variables, events):
+                    pass
+                
+                # Get the bridge instance from runtime to collect results
+                # The runtime should expose the bridge for result collection
+                if hasattr(runtime, '_last_bridge'):
+                    result_collector = runtime._last_bridge
+                
+                # Collect the streamed content and usage
+                content = ""
+                usage = {}
+                
+                if result_collector:
+                    content = result_collector.get_collected_text()
+                    usage = result_collector.get_final_usage() or {}
+                    
+                    # Parse JSON if schema provided
+                    if definition.json_schema and content:
+                        try:
+                            from ..validators.json_schema import validate_json_schema
+                            parsed = json.loads(content)
+                            validate_json_schema(parsed, definition.json_schema)
+                            content = parsed  # Return parsed content
+                        except Exception:
+                            # Keep as string if parsing/validation fails
+                            pass
+                
+                result = AgentResult(
+                    content=content,
+                    usage=usage,
+                    model=definition.model,
+                    elapsed_ms=int((time.time() - start_time) * 1000),
+                    provider_metadata={"runtime": runtime_name},
+                    trace_id=opts.trace_id
+                )
+            else:
+                # Non-streaming mode
+                runtime_result = await runtime.run(prepared, variables)
+                
+                # Convert runtime result to AgentResult
+                result = AgentResult(
+                    content=runtime_result.content,
+                    usage=runtime_result.usage,
+                    model=runtime_result.model,
+                    elapsed_ms=runtime_result.elapsed_ms,
+                    provider_metadata=runtime_result.provider_metadata,
+                    trace_id=runtime_result.trace_id,
+                    confidence=runtime_result.confidence,
+                    cost_usd=runtime_result.cost_usd,
+                    cost_breakdown=runtime_result.cost_breakdown,
+                    error=runtime_result.error,
+                    status=runtime_result.status
+                )
+            
+            # Record metrics
+            if self.metrics_sink:
+                usage = result.usage or {}
+                metrics = AgentMetrics(
+                    request_id=run_options.request_id,
+                    trace_id=result.trace_id,
+                    model=definition.model,
+                    latency_ms=result.elapsed_ms,
+                    input_tokens=int(usage.get("prompt_tokens", 0)),
+                    output_tokens=int(usage.get("completion_tokens", 0)),
+                    cached_tokens=int(usage.get("cache_info", {}).get("cached_tokens", 0)) if isinstance(usage.get("cache_info", {}), dict) else 0,
+                    retries=0,
+                    error_class=None,
+                    tools_used=[t.name for t in (definition.tools or [])],
+                    # Add runtime dimension
+                    agent_runtime=runtime_name
+                )
+                try:
+                    await self.metrics_sink.record(metrics)
+                except Exception:
+                    pass
+            
+            # Store in idempotency cache
+            if opts.idempotency_key:
+                self.idempotency.store_result(opts.idempotency_key, result)
+            
+            return result
+            
+        except Exception as e:
+            # Record error metrics
+            if self.metrics_sink:
+                metrics = AgentMetrics(
+                    request_id=run_options.request_id,
+                    trace_id=opts.trace_id,
+                    model=definition.model,
+                    latency_ms=int((time.time() - start_time) * 1000),
+                    input_tokens=0,
+                    output_tokens=0,
+                    cached_tokens=0,
+                    retries=0,
+                    error_class=type(e).__name__,
+                    tools_used=[t.name for t in (definition.tools or [])],
+                    agent_runtime=runtime_name
+                )
+                try:
+                    await self.metrics_sink.record(metrics)
+                except Exception:
+                    pass
+            
+            # Re-raise as ProviderError
+            raise ProviderError(str(e))
 
 

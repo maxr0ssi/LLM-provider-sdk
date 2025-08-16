@@ -133,6 +133,7 @@ By centralizing LLM interactions, we ensure:
 ### Requirements
 - Python 3.10 or higher
 - API keys for the providers you want to use
+- OpenAI Agents SDK (for agent runtime): `pip install openai-agents`
 
 ### Install from GitHub (Recommended)
 ```bash

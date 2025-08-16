@@ -43,6 +43,9 @@ dev = [
 tiktoken = [
     "tiktoken>=0.5.0",
 ]
+openai-agents = [
+    "openai-agents>=0.1.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/steer-ai/steer-llm-sdk"
