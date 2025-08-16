@@ -4,26 +4,26 @@ This module provides the integration between our agent framework
 and the OpenAI Agents SDK, handling agent creation, execution, and streaming.
 """
 
+import asyncio
+import json
 import os
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional, Callable
-import json
-import asyncio
 from functools import partial
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
-from ..base import AgentRuntimeAdapter, AgentRunOptions, PreparedRun, AgentRunResult
-from ..errors import map_openai_agents_error, SchemaError
-from ..streaming import AgentStreamingBridge
 from ....agents.models.agent_definition import AgentDefinition, Tool
 from ....agents.validators.json_schema import validate_json_schema
-from .tools import convert_tools_to_sdk_format, extract_tool_results, validate_tool_compatibility
 from ....core.capabilities import get_capabilities_for_model
 from ....core.normalization.params import normalize_params
 from ....core.normalization.usage import normalize_usage
-from ....streaming.manager import EventManager
-from ....reliability.budget import clamp_params_to_budget
 from ....core.routing.selector import calculate_exact_cost
 from ....models.generation import GenerationParams
+from ....reliability.budget import clamp_params_to_budget
+from ....streaming.manager import EventManager
+from ..base import AgentRunOptions, AgentRunResult, AgentRuntimeAdapter, PreparedRun
+from ..errors import SchemaError, map_openai_agents_error
+from ..streaming import AgentStreamingBridge
+from .tools import convert_tools_to_sdk_format, extract_tool_results, validate_tool_compatibility
 
 # Lazy import for optional dependency
 try:

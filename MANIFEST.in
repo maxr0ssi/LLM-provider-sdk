@@ -1,17 +1,16 @@
 include README.md
 include LICENSE
 include pyproject.toml
+include requirements.txt
 recursive-include steer_llm_sdk *.py
 recursive-include steer_llm_sdk *.json
 recursive-include steer_llm_sdk *.yaml
 recursive-include steer_llm_sdk *.yml
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
 recursive-exclude tests *
 recursive-exclude docs *
-recursive-exclude examples *
-prune __pycache__
-prune *.egg-info
-global-exclude *.pyc
-global-exclude *.pyo
+prune .github
+prune .git
+global-exclude *.log
 global-exclude .DS_Store
-global-exclude .git*
-global-exclude *.md

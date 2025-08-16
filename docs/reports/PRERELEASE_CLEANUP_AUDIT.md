@@ -215,9 +215,11 @@ Current state has three abstractions:
 - [x] Remove `cost_per_1k_tokens` field from models ✅
 - [x] Update .gitignore ✅
 - [x] Verify all tests pass after cleanup ✅
-- [ ] Update README with current architecture
-- [ ] Remove or consolidate redundant documentation
+- [x] Update README with current architecture ✅
+- [x] Remove or consolidate redundant documentation ✅
 - [x] Clean up `__pycache__` directories (437 found) ✅
+- [x] Implement lazy circuit breaker initialization ✅
+- [x] Refactor model configurations to reduce duplication ✅
 - [ ] Tag release candidate
 
 ## Cleanup Status - COMPLETED ✅
@@ -250,6 +252,30 @@ Current state has three abstractions:
 - Repository builds successfully
 - ~500 lines of legacy code removed
 - ~10% reduction in file count achieved
+
+### Additional Cleanup Completed:
+
+6. **Updated README.md**:
+   - Added comprehensive architecture overview with layered design
+   - Added key features section highlighting all capabilities
+   - Updated documentation links
+   - Added v0.3.0 changelog entry
+
+7. **Consolidated streaming documentation**:
+   - Created unified `docs/guides/streaming.md` guide
+   - Removed redundant files: `streaming-usage.md`, `streaming-events.md`, `STREAMING_CONSOLIDATION_PLAN.md`
+   - Updated all references to point to new guide
+
+8. **Implemented lazy circuit breaker initialization**:
+   - Removed eager initialization in `router.py`
+   - Circuit breakers now created on-demand
+   - Reduces memory footprint at startup
+
+9. **Refactored model configurations**:
+   - Created `model_families.py` with base configurations
+   - Reduced GPT model configs from ~180 lines to ~90 lines
+   - Used inheritance pattern for model families
+   - ~50% reduction in configuration code
 
 ## Conclusion
 

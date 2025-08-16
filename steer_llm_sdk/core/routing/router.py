@@ -53,26 +53,23 @@ class LLMRouter:
         
         # Streaming retry manager
         self.streaming_retry_manager = StreamingRetryManager(self.retry_manager)
-        
-        # Create circuit breakers for each provider
-        self._init_circuit_breakers()
     
-    def _init_circuit_breakers(self):
-        """Initialize circuit breakers for each provider."""
-        # Default circuit breaker config
-        default_config = CircuitBreakerConfig(
-            failure_threshold=5,
-            success_threshold=2,
-            timeout=60.0,
-            window_size=60.0
-        )
-        
-        # Create circuit breaker for each provider
-        for provider_type in self.providers:
-            self.circuit_manager.get_or_create(
-                provider_type.value,
+    def _get_circuit_breaker(self, provider_name: str):
+        """Get or create circuit breaker for provider (lazy initialization)."""
+        circuit_breaker = self.circuit_manager.get(provider_name)
+        if not circuit_breaker:
+            # Default circuit breaker config
+            default_config = CircuitBreakerConfig(
+                failure_threshold=5,
+                success_threshold=2,
+                timeout=60.0,
+                window_size=60.0
+            )
+            circuit_breaker = self.circuit_manager.get_or_create(
+                provider_name,
                 default_config
             )
+        return circuit_breaker
     
     def _get_retry_policy(self, provider: str, params: Dict[str, Any]) -> RetryPolicy:
         """Get retry policy for request."""
@@ -118,7 +115,7 @@ class LLMRouter:
         provider_name = config.provider.value
         
         # Get circuit breaker and retry policy
-        circuit_breaker = self.circuit_manager.get(provider_name)
+        circuit_breaker = self._get_circuit_breaker(provider_name)
         retry_policy = self._get_retry_policy(provider_name, raw_params)
         
         # Check if circuit breaker is enabled
@@ -239,7 +236,7 @@ class LLMRouter:
         provider_name = config.provider.value
         
         # Get circuit breaker
-        circuit_breaker = self.circuit_manager.get(provider_name)
+        circuit_breaker = self._get_circuit_breaker(provider_name)
         
         # Create streaming config based on streaming options or environment
         # Check for streaming_options in extra fields (Pydantic v2)
@@ -307,7 +304,7 @@ class LLMRouter:
         status = {}
         for provider_type, provider in self.providers.items():
             provider_name = provider_type.value
-            circuit_breaker = self.circuit_manager.get(provider_name)
+            circuit_breaker = self._get_circuit_breaker(provider_name)
             
             status[provider_name] = {
                 "available": provider.is_available(),

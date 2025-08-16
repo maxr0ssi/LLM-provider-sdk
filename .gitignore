@@ -169,6 +169,8 @@ run_tests.py
 # Documentation builds
 docs/_build/
 *.pdf
+.claude/
+.cursor/
 
 # Private PyPI
 .htpasswd

@@ -1,6 +1,45 @@
 # Steer LLM SDK
 
-A unified Python SDK for integrating multiple Large Language Model (LLM) providers (OpenAI, Anthropic, xAI) with a consistent interface, intelligent routing, and comprehensive model management.
+A production-ready Python SDK for integrating multiple Large Language Model (LLM) providers with enterprise-grade features including intelligent routing, unified streaming, agent infrastructure, and comprehensive observability.
+
+## Key Features
+
+- **🔄 Multi-Provider Support**: Seamless integration with OpenAI, Anthropic, and xAI
+- **🚀 Unified Streaming**: Consolidated streaming architecture with consistent behavior across providers
+- **🤖 Agent Infrastructure**: Native OpenAI Agents SDK integration with tools and structured outputs
+- **💰 Cost Optimization**: Built-in pricing calculations with cache-aware billing
+- **🛡️ Enterprise Reliability**: Circuit breakers, retry mechanisms, and idempotency support
+- **📊 Observability**: Comprehensive metrics, tracing, and performance monitoring
+- **⚡ High Performance**: Async-first design with connection pooling and streaming optimizations
+- **🔧 Extensible**: Plugin architecture for custom providers and observability sinks
+
+## Architecture Overview
+
+The SDK implements a layered architecture designed for scalability and maintainability:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Application Layer                     │
+│  (SteerLLMClient, Agent Runner, HTTP API)               │
+├─────────────────────────────────────────────────────────┤
+│                    Streaming Layer                       │
+│  (StreamingHelper, EventProcessor, StreamAdapter)       │
+├─────────────────────────────────────────────────────────┤
+│                    Routing Layer                         │
+│  (LLMRouter, Circuit Breakers, Retry Manager)          │
+├─────────────────────────────────────────────────────────┤
+│                    Provider Layer                        │
+│  (OpenAI, Anthropic, xAI Adapters)                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Core Components
+
+- **Routing Layer**: Intelligent request routing with circuit breakers and retry logic
+- **Streaming Layer**: Unified streaming pipeline with event processing and normalization
+- **Provider Layer**: Normalized interfaces for each LLM provider
+- **Observability Layer**: Metrics collection, distributed tracing, and performance monitoring
+- **Agent Layer**: Advanced agent capabilities with tool execution and structured outputs
 
 ## Overview
 ### Streaming API (Updated)
@@ -135,28 +174,38 @@ By centralizing LLM interactions, we ensure:
 - Python 3.10 or higher
 - API keys for the providers you want to use
 
-### Install from GitHub (Recommended)
+### Install from GitHub Package Registry (Private Package)
 ```bash
+# Configure GitHub authentication
+export GITHUB_TOKEN=your_github_personal_access_token
+
 # Install base SDK
-pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main
+pip install steer-llm-sdk --index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.0/
 
-# Install with OpenAI Agents SDK support (for agent runtime features)
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[openai-agents]"
-
-# Install with token counting support
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[tiktoken]"
-
-# Install with HTTP API endpoints (requires FastAPI)
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[http]"
-
-# Install with all optional dependencies
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@main#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
-
-# Or install a specific version/tag
-pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.2.1
+# Or add to requirements.txt
+--index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.0/
+steer-llm-sdk[openai-agents,tiktoken]
 ```
 
 ### Install from Source (Development)
+```bash
+# Install base SDK
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0
+
+# Install with OpenAI Agents SDK support (for agent runtime features)
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0#egg=steer-llm-sdk[openai-agents]"
+
+# Install with token counting support
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0#egg=steer-llm-sdk[tiktoken]"
+
+# Install with HTTP API endpoints (requires FastAPI)
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0#egg=steer-llm-sdk[http]"
+
+# Install with all optional dependencies
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.0#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
+```
+
+### Local Development
 ```bash
 git clone https://github.com/maxr0ssi/LLM-provider-sdk.git
 cd LLM-provider-sdk
@@ -703,7 +752,31 @@ For issues and questions:
 - Create an issue on GitHub
 - Contact the Steer team at support@steer.ai
 
+## Documentation
+
+- **[Architecture Overview](docs/architecture/)**: Detailed system design and components
+- **[Streaming Guide](docs/guides/streaming.md)**: Complete streaming implementation guide
+- **[Agent Development](docs/guides/agent-runtime-integration.md)**: Building agents with tools
+- **[HTTP API Reference](docs/guides/http-endpoints.md)**: REST API endpoints documentation
+- **[Configuration Guide](docs/configuration/)**: Provider and system configuration
+- **[Metrics & Monitoring](docs/architecture/metrics.md)**: Observability setup
+
 ## Changelog
+
+### v0.3.0 (2025-08)
+- Agent infrastructure with OpenAI Agents SDK integration
+- Unified streaming architecture consolidation
+- Enhanced observability with metrics and tracing
+- Circuit breakers and advanced retry mechanisms
+- Responses API support for GPT-5 models
+- Pre-release cleanup and optimization
+
+### v0.2.x (2025-07)
+- Layered architecture implementation (Phases 0-7)
+- FastAPI separation into optional HTTP module
+- Comprehensive pricing system overhaul
+- Streaming API split (stream vs stream_with_usage)
+- Performance optimizations and connection pooling
 
 ### v0.1.0 (2024-06-28)
 - Initial release

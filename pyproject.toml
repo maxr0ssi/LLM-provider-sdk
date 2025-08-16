@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "steer-llm-sdk"
-version = "0.2.1"
+version = "0.3.0"
 description = "Multi-provider LLM integration SDK with normalization and validation"
 readme = "README.md"
-authors = [{name = "Max Rossi"}]
+authors = [{name = "Max Rossi", email = "maxrossi@steer-ai.com"}]
 license = {text = "Proprietary"}
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: Other/Proprietary License",
     "Operating System :: OS Independent",
@@ -50,7 +50,10 @@ openai-agents = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/steer-ai/steer-llm-sdk"
+Homepage = "https://github.com/maxr0ssi/LLM-provider-sdk"
+Repository = "https://github.com/maxr0ssi/LLM-provider-sdk"
+Documentation = "https://github.com/maxr0ssi/LLM-provider-sdk/tree/main/docs"
+Issues = "https://github.com/maxr0ssi/LLM-provider-sdk/issues"
 
 [project.scripts]
 steer-llm = "steer_llm_sdk.cli:main"

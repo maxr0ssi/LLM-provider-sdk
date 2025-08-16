@@ -1,28 +1,44 @@
-# SDK Docs
+# Steer LLM SDK Documentation
 
-- Architecture
-  - `architecture/projects/layered-modular/` (plans, diagrams, refactoring, trackers)
-    - Phase 0.5: Directory restructuring COMPLETE (2025-08-14)
-    - Phase 7: OpenAI Agents SDK Integration COMPLETE (2025-08-16)
-    - Shims removed: use new layer import paths (see migration.md)
-- Guides
-  - `guides/agent-runtime-integration.md` - **NEW: OpenAI Agents SDK usage guide**
-  - `guides/agents-openai-responses.md`
-  - `guides/chat-completions.md`
-  - `guides/streaming-api-migration.md` - **NEW: Migrate from return_usage to stream_with_usage**
-  - `pricing.md` - Model pricing and cost calculation
-- Integrations
-  - OpenAI Agents SDK (Phase 7 - COMPLETE)
-    - `integrations/openai-agents/overview.md` - Getting started with agents
-    - `integrations/openai-agents/technical-design.md` - Architecture details
-    - `integrations/openai-agents/implementation.md` - Code examples
-    - `integrations/openai-agents/configuration.md` - Setup and config
-    - `integrations/openai-agents/diagrams/flows.md` - Event flows and error handling
-- Reports
-  - `reports/NEXUS_SDK_MVP_REPORT.md`
-  - `reports/NEXUS_SDK_ARCHITECTURE.md`
+Welcome to the Steer LLM SDK documentation. This directory contains comprehensive guides, architectural documentation, and integration examples.
 
-Quick links:
-- Agent Runtime: `guides/agent-runtime-integration.md` and `integrations/openai-agents/`
-- Streaming API: see project root README (Streaming API) and Guides.
-- Nexus integration: `architecture/projects/layered-modular/nexus-integration.md`.
+## Quick Navigation
+
+- **[Documentation Index](INDEX.md)** - Complete list of all documentation
+- **[Main README](../README.md)** - SDK overview, installation, and quick start
+
+## Key Documentation
+
+### Getting Started
+- [Chat Completions Guide](guides/chat-completions.md) - Basic usage patterns
+- [Streaming Guide](guides/streaming.md) - Complete streaming implementation
+- [Configuration Guide](configuration/) - Provider and system setup
+
+### Architecture
+- [Streaming Architecture](architecture/streaming.md) - Unified streaming design
+- [Layered Architecture](architecture/projects/layered-modular/) - System design and phases
+- [Metrics & Observability](architecture/metrics.md) - Monitoring and tracing
+
+### Advanced Features
+- [Agent Runtime](guides/agent-runtime-integration.md) - Building AI agents
+- [OpenAI Agents SDK](integrations/openai-agents/) - Native agent integration
+- [Responses API](guides/responses-api-advanced.md) - GPT-5 advanced features
+
+### Integration
+- [HTTP Endpoints](guides/http-endpoints.md) - REST API reference
+- [Nexus Integration](architecture/projects/nexus/) - Agent mesh platform
+- [Custom Metrics](guides/custom-sinks.md) - Observability extensions
+
+## Recent Updates
+
+- **v0.3.0** - Agent infrastructure, streaming consolidation, pre-release cleanup
+- **Streaming API Split** - New `stream_with_usage()` method ([migration guide](guides/streaming-api-migration.md))
+- **OpenAI Agents SDK** - Full integration with tools and structured outputs
+
+## Contributing
+
+When adding new documentation:
+1. Place guides in `guides/`
+2. Place architecture docs in `architecture/`
+3. Update the [INDEX.md](INDEX.md) file
+4. Follow the existing markdown style
