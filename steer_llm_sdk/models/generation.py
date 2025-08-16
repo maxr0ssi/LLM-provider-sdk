@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Dict, Any, List
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Optional, Dict, Any, List, Union
 from enum import Enum
 
 
@@ -11,17 +11,47 @@ class ProviderType(str, Enum):
 
 
 class GenerationParams(BaseModel):
-    """Normalized generation parameters for all providers."""
-    model: str
-    max_tokens: int = Field(default=512, ge=1, le=50000)  # Increased limit
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    top_p: float = Field(default=1.0, ge=0.0, le=1.0)
-    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
-    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
-    stop: Optional[List[str]] = None
-    # Additional parameters that providers might use
-    response_format: Optional[Dict[str, Any]] = None
-    seed: Optional[int] = None
+    """
+    Normalized generation parameters for all providers.
+    
+    This model defines the standard parameters that can be used across all providers.
+    Provider adapters use the capability registry to map these parameters to
+    provider-specific formats.
+    """
+    # Core parameters
+    model: str = Field(..., description="Model identifier")
+    max_tokens: int = Field(default=512, ge=1, le=50000, description="Maximum tokens to generate")
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
+    top_p: float = Field(default=1.0, ge=0.0, le=1.0, description="Nucleus sampling parameter")
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Frequency penalty")
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Presence penalty")
+    stop: Optional[List[str]] = Field(None, description="Stop sequences")
+    
+    # Structured output and determinism
+    response_format: Optional[Dict[str, Any]] = Field(None, description="Response format (e.g., JSON schema)")
+    seed: Optional[int] = Field(None, description="Random seed for deterministic generation")
+    
+    # New fields for Responses API and agent support
+    responses_use_instructions: Optional[bool] = Field(
+        None, 
+        description="Map first system message to instructions field (Responses API)"
+    )
+    strict: Optional[bool] = Field(
+        None,
+        description="Enable strict schema adherence (Responses API)"
+    )
+    reasoning: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Reasoning configuration (e.g., effort levels)"
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Additional metadata (trace_id, idempotency_key, etc.)"
+    )
+    
+    # Provider-specific parameters (kept for backward compatibility)
+    top_k: Optional[int] = Field(None, ge=0, description="Top-k sampling (Anthropic)")
+    logprobs: Optional[bool] = Field(None, description="Return log probabilities (OpenAI)")
     
     class Config:
         extra = "allow"  # Allow additional fields to pass through
@@ -52,6 +82,23 @@ class ModelConfig(BaseModel):
     input_cost_per_1k_tokens: Optional[float] = None
     output_cost_per_1k_tokens: Optional[float] = None
     cached_input_cost_per_1k_tokens: Optional[float] = None
+    # Legacy blended pricing support for tests
+    cost_per_1k_tokens: Optional[float] = None
+    
+    @model_validator(mode='after')
+    def validate_pricing(self):
+        """Validate that if one pricing field is set, both must be set."""
+        # Only enforce if we're setting exact pricing (not legacy)
+        has_input = self.input_cost_per_1k_tokens is not None
+        has_output = self.output_cost_per_1k_tokens is not None
+        
+        if has_input != has_output:
+            if has_input:
+                raise ValueError("If input_cost_per_1k_tokens is set, output_cost_per_1k_tokens must also be set")
+            else:
+                raise ValueError("If output_cost_per_1k_tokens is set, input_cost_per_1k_tokens must also be set")
+                
+        return self
 
 
 class GenerationRequest(BaseModel):
@@ -84,6 +131,7 @@ class StreamingResponseWithUsage:
         self.finish_reason = None
         self.cost_usd = None
         self.cost_breakdown = None
+        self.final_json = None  # Store final JSON from handler
     
     def add_chunk(self, chunk: str):
         """Add a chunk to the response."""
@@ -103,6 +151,18 @@ class StreamingResponseWithUsage:
     def get_text(self) -> str:
         """Get the complete text from all chunks."""
         return ''.join(self.chunks)
+    
+    def set_final_json(self, json_data: Optional[Union[Dict[str, Any], List[Any]]]):
+        """Set the final JSON data from the JSON handler."""
+        self.final_json = json_data
+    
+    def get_json(self) -> Optional[Union[Dict[str, Any], List[Any]]]:
+        """Get the final JSON data if available."""
+        return self.final_json
+    
+    def get_usage(self) -> Optional[Dict[str, Any]]:
+        """Get the usage data if available."""
+        return self.usage
     
     def __iter__(self):
         """Allow iteration over chunks."""

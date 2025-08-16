@@ -12,6 +12,9 @@ from steer_llm_sdk.models.generation import (
     ProviderType
 )
 from steer_llm_sdk.models.conversation_types import ConversationMessage, TurnRole as ConversationRole
+from tests.helpers.streaming_mocks import (
+    create_openai_stream, create_anthropic_stream, create_xai_stream
+)
 
 
 @pytest.fixture
@@ -100,22 +103,30 @@ def mock_openai_client():
     # Mock chat completions
     completion = Mock()
     completion.choices = [Mock(message=Mock(content="Test response"), finish_reason="stop")]
-    completion.usage = Mock(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+    # Make usage a proper object with model_dump method
+    usage_mock = Mock()
+    usage_mock.prompt_tokens = 10
+    usage_mock.completion_tokens = 5
+    usage_mock.total_tokens = 15
+    usage_mock.model_dump.return_value = {
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+        "total_tokens": 15
+    }
+    completion.usage = usage_mock
     completion.model = "gpt-4o-mini"
     
     client.chat.completions.create = AsyncMock(return_value=completion)
     
     # Mock streaming
-    async def mock_stream():
-        chunks = ["Test", " response", " streaming"]
-        for chunk in chunks:
-            delta = Mock(content=chunk)
-            choice = Mock(delta=delta, finish_reason=None)
-            yield Mock(choices=[choice])
+    chunks = ["Test", " response", " streaming"]
     
-    client.chat.completions.create = AsyncMock(side_effect=lambda **kwargs: 
-        mock_stream() if kwargs.get("stream") else completion
-    )
+    async def create_response(**kwargs):
+        if kwargs.get("stream"):
+            return create_openai_stream(chunks)
+        return completion
+    
+    client.chat.completions.create = AsyncMock(side_effect=create_response)
     
     return client
 
@@ -129,23 +140,27 @@ def mock_anthropic_client():
     message = Mock()
     message.content = [Mock(type="text", text="Test response")]
     message.stop_reason = "end_turn"
-    message.usage = Mock(input_tokens=10, output_tokens=5)
+    # Make usage a proper object with model_dump method
+    usage_mock = Mock()
+    usage_mock.input_tokens = 10
+    usage_mock.output_tokens = 5
+    usage_mock.model_dump.return_value = {
+        "input_tokens": 10,
+        "output_tokens": 5
+    }
+    message.usage = usage_mock
     
     client.messages.create = AsyncMock(return_value=message)
     
     # Mock streaming
-    async def mock_stream():
-        events = [
-            Mock(type="content_block_delta", delta=Mock(text="Test")),
-            Mock(type="content_block_delta", delta=Mock(text=" response")),
-            Mock(type="message_stop", message=Mock(usage=Mock(input_tokens=10, output_tokens=5)))
-        ]
-        for event in events:
-            yield event
+    chunks = ["Test", " response"]
     
-    client.messages.create = AsyncMock(side_effect=lambda **kwargs:
-        mock_stream() if kwargs.get("stream") else message
-    )
+    async def create_response(**kwargs):
+        if kwargs.get("stream"):
+            return create_anthropic_stream(chunks)
+        return message
+    
+    client.messages.create = AsyncMock(side_effect=create_response)
     
     return client
 
@@ -163,13 +178,8 @@ def mock_xai_client():
     client.chat.create = AsyncMock(return_value=chat)
     
     # Mock streaming
-    async def mock_stream():
-        chunks = ["Test", " response"]
-        for chunk_text in chunks:
-            chunk = Mock(content=chunk_text)
-            yield (Mock(), chunk)
-    
-    chat.stream = mock_stream
+    chunks = ["Test", " response"]
+    chat.stream = lambda: create_xai_stream(chunks)
     
     return client
 

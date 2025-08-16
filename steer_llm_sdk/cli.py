@@ -5,7 +5,7 @@ import asyncio
 import json
 from typing import Optional
 
-from .main import SteerLLMClient
+from .api.client import SteerLLMClient
 from .models.conversation_types import ConversationMessage, TurnRole
 
 
@@ -14,20 +14,17 @@ async def generate_text(model: str, prompt: str, max_tokens: Optional[int] = Non
     """Generate text using the specified model."""
     client = SteerLLMClient()
     
-    params = {}
-    if max_tokens:
-        params['max_tokens'] = max_tokens
-    if temperature is not None:
-        params['temperature'] = temperature
+    # Normalize params
+    # Use model-aware defaults in the client if not provided
     
     try:
         if stream:
             print(f"Streaming response from {model}:\n")
-            async for chunk in client.generate_stream(prompt, model, params):
+            async for chunk in client.stream(prompt, model=model, temperature=temperature, max_tokens=max_tokens):
                 print(chunk, end='', flush=True)
             print()  # New line at the end
         else:
-            result = await client.generate(prompt, model, params)
+            result = await client.generate(prompt, model=model, temperature=temperature, max_tokens=max_tokens)
             print(f"Response from {model}:\n")
             print(result.text)
             print(f"\nTokens used: {result.usage}")

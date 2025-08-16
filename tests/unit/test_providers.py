@@ -4,9 +4,9 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 import os
 
-from steer_llm_sdk.llm.providers.openai import OpenAIProvider
-from steer_llm_sdk.llm.providers.anthropic import AnthropicProvider
-from steer_llm_sdk.llm.providers.xai import XAIProvider
+from steer_llm_sdk.providers.openai.adapter import OpenAIProvider
+from steer_llm_sdk.providers.anthropic.adapter import AnthropicProvider
+from steer_llm_sdk.providers.xai.adapter import XAIProvider
 from steer_llm_sdk.models.generation import GenerationParams
 from steer_llm_sdk.models.conversation_types import ConversationMessage, TurnRole as ConversationRole
 
@@ -185,8 +185,13 @@ class TestXAIProvider:
         
         assert response.text == "Test response"
         assert response.provider == "xai"
-        # xAI doesn't provide usage stats - usage dict is empty
-        assert response.usage == {}
+        # xAI doesn't provide usage stats - normalize_usage returns standard format with zeros
+        assert response.usage == {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cache_info": {}
+        }
     
     @pytest.mark.asyncio
     async def test_generate_conversation(self, provider, mock_xai_client):

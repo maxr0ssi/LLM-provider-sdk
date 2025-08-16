@@ -159,6 +159,9 @@ Thumbs.db
 *.swp
 *~
 
+# Archive directories
+**/archive/
+
 # Test outputs
 test_*.py
 run_tests.py
@@ -166,6 +169,8 @@ run_tests.py
 # Documentation builds
 docs/_build/
 *.pdf
+.claude/
+.cursor/
 
 # Private PyPI
 .htpasswd

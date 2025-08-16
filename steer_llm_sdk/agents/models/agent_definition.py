@@ -1,34 +1,14 @@
-from __future__ import annotations
-
-from typing import Any, Dict, List, Optional, Callable
-from pydantic import BaseModel, Field
-
-
-class Tool(BaseModel):
-    name: str
-    description: str
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    handler: Callable
-    deterministic: bool = True
-
-
-class AgentDefinition(BaseModel):
-    system: str
-    user_template: str
-    json_schema: Optional[Dict[str, Any]] = None
-    model: str
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    tools: Optional[List[Tool]] = None
-    version: str = "1.0"
-
 """
 Agent definition models for the Nexus agent framework.
 
 Provides core models for defining agents, their options, and results.
 """
 
-from typing import Any, Dict, List, Optional, Callable
-from pydantic import BaseModel, Field, ConfigDict
+from __future__ import annotations
+
+from typing import Any, Callable, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Budget(BaseModel):

@@ -11,7 +11,7 @@ from .models.agent_definition import (
     AgentResult,
     Budget
 )
-from .models.capabilities import ProviderCapabilities
+from ..core.capabilities import ProviderCapabilities
 
 __all__ = [
     "AgentDefinition",

@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "steer-llm-sdk"
-version = "0.2.1"
+version = "0.3.0"
 description = "Multi-provider LLM integration SDK with normalization and validation"
 readme = "README.md"
-authors = [{name = "Max Rossi"}]
+authors = [{name = "Max Rossi", email = "maxrossi@steer-ai.com"}]
 license = {text = "Proprietary"}
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: Other/Proprietary License",
     "Operating System :: OS Independent",
@@ -27,7 +27,6 @@ dependencies = [
     "xai-sdk>=1.0.0rc1",
     "jinja2>=3.0.0",
     "jsonschema>=4.0.0",
-    "fastapi>=0.100.0",
     "httpx>=0.24.0",
     "python-dotenv>=1.0.0",
 ]
@@ -40,9 +39,21 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
 ]
+http = [
+    "fastapi>=0.100.0",
+]
+tiktoken = [
+    "tiktoken>=0.5.0",
+]
+openai-agents = [
+    "openai-agents>=0.1.0",
+]
 
 [project.urls]
-Homepage = "https://github.com/steer-ai/steer-llm-sdk"
+Homepage = "https://github.com/maxr0ssi/LLM-provider-sdk"
+Repository = "https://github.com/maxr0ssi/LLM-provider-sdk"
+Documentation = "https://github.com/maxr0ssi/LLM-provider-sdk/tree/main/docs"
+Issues = "https://github.com/maxr0ssi/LLM-provider-sdk/issues"
 
 [project.scripts]
 steer-llm = "steer_llm_sdk.cli:main"
@@ -63,3 +74,6 @@ ignore = ["E501"]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]

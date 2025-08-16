@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from ...llm.capabilities import get_capabilities_for_model
+from ...core.capabilities import get_capabilities_for_model
 
 
 def apply_deterministic_policy(params: Dict[str, Any], model_id: str) -> Dict[str, Any]:
