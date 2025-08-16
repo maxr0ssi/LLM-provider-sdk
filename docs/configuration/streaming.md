@@ -2,6 +2,8 @@
 
 This guide covers configuration options for streaming operations in the Steer LLM SDK.
 
+> **Note**: The streaming architecture has been consolidated to use a unified pipeline. See the [Streaming Architecture](../architecture/streaming.md) documentation for details on the StreamingHelper, EventProcessor, and StreamAdapter components.
+
 ## StreamingOptions
 
 The `StreamingOptions` class provides comprehensive control over streaming behavior:
@@ -181,6 +183,8 @@ options = StreamingOptions(
 
 ### Event Processor Configuration
 
+The consolidated architecture uses `EventProcessor` for all streaming events. You can configure it with filters and transformers:
+
 ```python
 from steer_llm_sdk.streaming.processor import create_event_processor
 
@@ -196,9 +200,14 @@ processor = create_event_processor(
     batch_timeout_ms=100  # Batch timeout
 )
 
+# The processor is automatically used when streaming
 options = StreamingOptions(
     event_processor=processor
 )
+
+# Or attach directly to adapter
+adapter = StreamAdapter("openai")
+adapter.set_event_processor(processor)
 ```
 
 ### Event Callbacks

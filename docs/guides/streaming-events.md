@@ -2,6 +2,8 @@
 
 This guide explains how to use the streaming events system in the Steer LLM SDK to monitor and react to events during text generation.
 
+> **Note**: The streaming architecture has been consolidated. Events are now processed through a unified pipeline using StreamingHelper, EventProcessor, and StreamAdapter. See the [Streaming Architecture](../architecture/streaming.md) and [Streaming Usage Guide](streaming-usage.md) for the latest patterns.
+
 ## Overview
 
 The streaming events system provides real-time visibility into the streaming process through typed events. This enables:

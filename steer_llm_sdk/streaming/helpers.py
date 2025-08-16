@@ -47,25 +47,44 @@ class StreamingHelper:
         
         try:
             async for event in stream:
-                # Normalize the delta
-                delta = adapter.normalize_delta(event)
-                text = delta.get_text()
+                # Handle tuple format (chunk, usage_data)
+                chunk_event = event
+                tuple_usage = None
+                if isinstance(event, tuple):
+                    chunk_event, tuple_usage = event
                 
-                if text:
-                    chunks.append(text)
-                    await adapter.track_chunk(len(text), text)
+                # Process chunk if present
+                if chunk_event is not None:
+                    # Normalize the delta
+                    delta = adapter.normalize_delta(chunk_event)
+                    text = delta.get_text()
                     
-                    if events:
-                        await events.emit_delta(events.create_delta_event(
-                            delta=delta,
-                            chunk_index=chunk_index,
-                            is_json=adapter.response_format and adapter.response_format.get("type") == "json_object"
-                        ))
-                    chunk_index += 1
+                    if text:
+                        chunks.append(text)
+                        await adapter.track_chunk(len(text), text)
+                        
+                        if events:
+                            await events.emit_delta(events.create_delta_event(
+                                delta=delta,
+                                chunk_index=chunk_index,
+                                is_json=adapter.response_format and adapter.response_format.get("type") == "json_object"
+                            ))
+                        chunk_index += 1
                 
-                # Check for usage data
-                if adapter.should_emit_usage(event):
-                    extracted_usage = adapter.extract_usage(event)
+                # Handle usage data from tuple
+                if tuple_usage is not None:
+                    # Extract usage from the usage_data dict
+                    if isinstance(tuple_usage, dict) and "usage" in tuple_usage:
+                        usage_data = tuple_usage["usage"]
+                        if events:
+                            await events.emit_usage(events.create_usage_event(
+                                usage=usage_data,
+                                is_estimated=False,
+                                confidence=1.0
+                            ))
+                # Also check for usage data in the event itself
+                elif adapter.should_emit_usage(chunk_event):
+                    extracted_usage = adapter.extract_usage(chunk_event)
                     if extracted_usage:
                         usage_data = extracted_usage
                         if events:
@@ -127,23 +146,40 @@ class StreamingHelper:
         
         try:
             async for event in stream:
-                # Normalize the delta
-                delta = adapter.normalize_delta(event)
-                text = delta.get_text()
+                # Handle tuple format (chunk, usage_data)
+                chunk_event = event
+                tuple_usage = None
+                if isinstance(event, tuple):
+                    chunk_event, tuple_usage = event
                 
-                if text:
-                    await adapter.track_chunk(len(text), text)
-                    await events.emit_delta(events.create_delta_event(
-                        delta=delta,
-                        chunk_index=chunk_index,
-                        is_json=adapter.response_format and adapter.response_format.get("type") == "json_object"
-                    ))
-                    chunk_index += 1
-                    yield text
+                # Process chunk if present
+                if chunk_event is not None:
+                    # Normalize the delta
+                    delta = adapter.normalize_delta(chunk_event)
+                    text = delta.get_text()
+                    
+                    if text:
+                        await adapter.track_chunk(len(text), text)
+                        await events.emit_delta(events.create_delta_event(
+                            delta=delta,
+                            chunk_index=chunk_index,
+                            is_json=adapter.response_format and adapter.response_format.get("type") == "json_object"
+                        ))
+                        chunk_index += 1
+                        yield text
                 
-                # Check for usage data
-                if adapter.should_emit_usage(event):
-                    extracted_usage = adapter.extract_usage(event)
+                # Handle usage data from tuple
+                if tuple_usage is not None:
+                    # Extract usage from the usage_data dict
+                    if isinstance(tuple_usage, dict) and "usage" in tuple_usage:
+                        await events.emit_usage(events.create_usage_event(
+                            usage=tuple_usage["usage"],
+                            is_estimated=False,
+                            confidence=1.0
+                        ))
+                # Also check for usage data in the event itself
+                elif adapter.should_emit_usage(chunk_event):
+                    extracted_usage = adapter.extract_usage(chunk_event)
                     if extracted_usage:
                         await events.emit_usage(events.create_usage_event(
                             usage=extracted_usage,

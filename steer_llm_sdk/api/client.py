@@ -15,6 +15,8 @@ from ..models.events import (
 )
 from ..streaming.manager import EventManager
 from ..streaming.processor import create_event_processor
+from ..streaming.helpers import StreamingHelper
+from ..streaming.adapter import StreamAdapter
 from ..observability import MetricsCollector, MetricsConfig, get_collector
 from ..observability.sinks import MetricsSink
 
@@ -185,35 +187,14 @@ class SteerLLMClient:
         if "enable_json_stream_handler" in kwargs:
             streaming_options.enable_json_stream_handler = kwargs.pop("enable_json_stream_handler")
         
-        # Configure event callbacks if provided
-        if any([on_start, on_delta, on_usage, on_complete, on_error]):
-            # Create event manager with callbacks
-            event_manager = EventManager(
-                on_start=on_start,
-                on_delta=on_delta,
-                on_usage=on_usage,
-                on_complete=on_complete,
-                on_error=on_error
-            )
-            
-            # Create event processor that uses the event manager
+        # Configure event processor if not already provided
+        if not hasattr(streaming_options, 'event_processor') or not streaming_options.event_processor:
+            # Create default event processor with correlation and timestamps
             event_processor = create_event_processor(
                 add_correlation=True,
                 add_timestamp=True,
                 background=False
             )
-            
-            # Add event manager as a custom transformer
-            class EventManagerTransformer:
-                def __init__(self, manager):
-                    self.manager = manager
-                
-                async def transform(self, event):
-                    # Emit to event manager
-                    await self.manager.emit_event(event)
-                    return event
-            
-            event_processor.add_transformer(EventManagerTransformer(event_manager))
             streaming_options.event_processor = event_processor
         
         # Pass streaming options to router
@@ -224,6 +205,19 @@ class SteerLLMClient:
         config = get_config(model)
         provider = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
         
+        # Create stream adapter
+        adapter = StreamAdapter(provider)
+        adapter.model = model
+        
+        # Configure adapter with response format for JSON mode
+        rf = params.get("response_format") if isinstance(params, dict) else None
+        if isinstance(rf, dict) and rf.get("type") == "json_object":
+            adapter.response_format = rf
+        
+        # Attach event processor to adapter if we have one
+        if hasattr(streaming_options, 'event_processor') and streaming_options.event_processor:
+            adapter.set_event_processor(streaming_options.event_processor)
+        
         response_wrapper = StreamingResponseWithUsage()
         
         # Track metrics
@@ -232,40 +226,50 @@ class SteerLLMClient:
             model=model,
             method="stream"
         ) as request_metrics:
-            # Track time to first token
-            first_chunk_time = None
+            # Create event manager if callbacks provided (backward compat)
+            events = None
+            if any([on_start, on_delta, on_usage, on_complete, on_error]):
+                events = EventManager(
+                    on_start=on_start,
+                    on_delta=on_delta,
+                    on_usage=on_usage,
+                    on_complete=on_complete,
+                    on_error=on_error
+                )
             
-            async for item in self.router.generate_stream(messages, model, params, True):
-                # Track time to first chunk
-                if first_chunk_time is None:
-                    first_chunk_time = time.time()
-                    request_metrics.time_to_first_token_ms = (first_chunk_time - request_metrics.timestamp) * 1000
-                
-                if isinstance(item, tuple):
-                    # Provider returned (chunk, usage_data)
-                    chunk, usage_data = item
-                    if chunk is not None:
-                        response_wrapper.add_chunk(chunk)
-                    if usage_data is not None:
-                        # Extract final JSON if available
-                        final_json = usage_data.pop("final_json", None)
-                        # Set usage data (without final_json)
-                        response_wrapper.set_usage(**usage_data)
-                        # Set final JSON if available
-                        if final_json is not None:
-                            response_wrapper.set_final_json(final_json)
-                        # Update metrics with usage
-                        request_metrics.prompt_tokens = usage_data.get('prompt_tokens', 0)
-                        request_metrics.completion_tokens = usage_data.get('completion_tokens', 0)
-                        request_metrics.total_tokens = usage_data.get('total_tokens', 0)
-                        request_metrics.cached_tokens = usage_data.get('cached_tokens', 0)
-                else:
-                    # Just a chunk
-                    response_wrapper.add_chunk(item)
+            # Use StreamingHelper to collect chunks and usage
+            text, usage_data, metrics = await StreamingHelper.collect_with_usage(
+                self.router.generate_stream(messages, model, params, True),
+                adapter,
+                events
+            )
             
-            # JSON handling is done by the streaming adapter
-            # The final JSON is already available via response_wrapper.get_json()
-            # No need for post-processing here
+            # Update response wrapper
+            response_wrapper.add_chunk(text)
+            if usage_data:
+                response_wrapper.set_usage(
+                    usage=usage_data,
+                    model=model,
+                    provider=provider
+                )
+                # Update request metrics
+                request_metrics.prompt_tokens = usage_data.get('prompt_tokens', 0)
+                request_metrics.completion_tokens = usage_data.get('completion_tokens', 0)
+                request_metrics.total_tokens = usage_data.get('total_tokens', 0)
+                request_metrics.cached_tokens = usage_data.get('cached_tokens', 0)
+            
+            # Handle JSON if needed
+            if adapter.response_format and adapter.response_format.get("type") == "json_object":
+                try:
+                    import json
+                    final_json = json.loads(text)
+                    response_wrapper.set_final_json(final_json)
+                except:
+                    pass  # Invalid JSON, keep as text
+            
+            # Set TTFT if available
+            if 'time_to_first_token_seconds' in metrics:
+                request_metrics.time_to_first_token_ms = metrics['time_to_first_token_seconds'] * 1000
             
             return response_wrapper
     

@@ -177,6 +177,34 @@ ANTHROPIC_API_KEY=your-anthropic-key
 XAI_API_KEY=your-xai-key
 ```
 
+### Streaming Configuration
+
+The SDK provides comprehensive streaming configuration options:
+
+```python
+from steer_llm_sdk.models.streaming import StreamingOptions, JSON_MODE_OPTIONS
+
+# Use preset configurations
+response = await client.stream_with_usage(
+    "Generate JSON data",
+    model="gpt-4",
+    response_format={"type": "json_object"},
+    streaming_options=JSON_MODE_OPTIONS  # Optimized for JSON
+)
+
+# Or create custom options
+options = StreamingOptions(
+    enable_usage_aggregation=True,     # Track token usage
+    enable_json_stream_handler=True,   # Handle JSON streaming
+    connection_timeout=5.0,            # Connection timeout in seconds
+    read_timeout=30.0,                 # Read timeout in seconds
+    retry_on_connection_error=True,    # Retry on connection errors
+    max_reconnect_attempts=3           # Maximum retry attempts
+)
+```
+
+For detailed streaming configuration options, see the [Streaming Configuration Guide](docs/configuration/streaming.md).
+
 ## Quick Start
 
 ### Basic Usage
@@ -504,26 +532,45 @@ For more details, see the [Agent Runtime Integration Guide](docs/guides/agent-ru
 
 ## Architecture
 
-The SDK follows a modular architecture:
+The SDK follows a modular architecture with a unified streaming pipeline:
+
+### Core Components
 
 ```
 steer_llm_sdk/
-├── __init__.py          # Public API exports
-├── main.py              # Client implementation
-├── cli.py               # Command-line interface
+├── api/                 # High-level client API
+│   └── client.py        # SteerLLMClient implementation
+├── core/                # Core functionality
+│   ├── routing/         # Request routing and model selection
+│   ├── capabilities/    # Model capabilities management
+│   └── pricing/         # Pricing calculations
+├── providers/           # Provider implementations
+│   ├── base.py          # Base provider interface
+│   ├── openai/          # OpenAI implementation
+│   ├── anthropic/       # Anthropic implementation
+│   └── xai/             # xAI implementation
+├── streaming/           # Unified streaming architecture
+│   ├── helpers.py       # StreamingHelper (orchestration)
+│   ├── processor.py     # EventProcessor (pipeline)
+│   ├── adapter.py       # StreamAdapter (normalization)
+│   └── manager.py       # EventManager (callbacks)
 ├── models/              # Data models and types
 │   ├── generation.py    # Request/response models
-│   └── conversation_types.py  # Conversation support
-├── llm/
-│   ├── providers/       # Provider implementations
-│   │   ├── openai.py
-│   │   ├── anthropic.py
-│   │   └── xai.py
-│   ├── router.py        # Request routing logic
-│   └── registry.py      # Model configuration
-└── config/              # Configuration management
-    └── models.py        # Model definitions
+│   ├── events.py        # Streaming event types
+│   └── streaming.py     # Streaming configuration
+└── observability/       # Metrics and monitoring
+    └── collector.py     # Metrics collection
 ```
+
+### Streaming Architecture
+
+The SDK uses a consolidated streaming architecture that ensures consistent behavior across all providers:
+
+1. **StreamingHelper** - High-level orchestration of streaming operations
+2. **EventProcessor** - Composable pipeline for filtering and transforming events  
+3. **StreamAdapter** - Provider-specific normalization and event lifecycle
+
+For detailed information, see the [Streaming Architecture documentation](docs/architecture/streaming.md).
 
 ## Development
 

@@ -16,6 +16,7 @@ from ...reliability.idempotency import IdempotencyManager
 from ...reliability.retry import RetryConfig, RetryManager
 from ...streaming.adapter import StreamAdapter
 from ...streaming.manager import EventManager
+from ...streaming.helpers import StreamingHelper
 from ..models.agent_definition import AgentDefinition
 from ..models.agent_options import AgentOptions
 from ..models.agent_result import AgentResult
@@ -85,6 +86,15 @@ class AgentRunner:
                 return cached
 
         if opts.streaming:
+            # Configure adapter with model and response format
+            config = get_config(definition.model)
+            provider_name = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
+            self.adapter = StreamAdapter(provider_name)
+            self.adapter.model = definition.model
+            if definition.json_schema and caps.supports_json_schema:
+                self.adapter.response_format = {"type": "json_object"}
+            
+            # Create EventManager for callbacks
             events = EventManager(
                 on_start=opts.metadata.get("on_start"),
                 on_delta=opts.metadata.get("on_delta"),
@@ -92,65 +102,57 @@ class AgentRunner:
                 on_complete=opts.metadata.get("on_complete"),
                 on_error=opts.metadata.get("on_error"),
             )
-            await events.emit_start({"model": definition.model})
-
-            final_usage = None
-            collected = []
+            
             # Stream with soft wall-clock budget
             ms_budget = None
             if isinstance(budget, dict) and "ms" in budget:
                 ms_budget = int(budget["ms"])
-
+            
             try:
-                async for item in self.router.generate_stream(messages, definition.model, params, return_usage=True):
-                    if isinstance(item, tuple):
-                        chunk, usage_data = item
-                        if chunk is not None:
-                            await events.emit_delta(self.adapter.normalize_delta(chunk))
-                            collected.append(chunk)
-                        if usage_data is not None:
-                            final_usage = usage_data["usage"]
-                            await events.emit_usage(final_usage)
-                    else:
-                        await events.emit_delta(self.adapter.normalize_delta(item))
-                        collected.append(item)
-
-                    if ms_budget is not None and (time.time() - start) * 1000 >= ms_budget:
-                        break
-            except ProviderError as e:
-                await events.emit_error(e)
+                # Create a generator that respects the budget
+                async def budget_aware_stream():
+                    stream_start = time.time()
+                    async for item in self.router.generate_stream(messages, definition.model, params, return_usage=True):
+                        yield item
+                        if ms_budget is not None and (time.time() - stream_start) * 1000 >= ms_budget:
+                            break
+                
+                # Use StreamingHelper to handle the streaming
+                text, usage_data, metrics = await StreamingHelper.collect_with_usage(
+                    budget_aware_stream(),
+                    self.adapter,
+                    events
+                )
+                
+                # Handle JSON schema validation
+                content: Any = text
+                if definition.json_schema:
+                    try:
+                        parsed = json.loads(text)
+                        validate_json_schema(parsed, definition.json_schema)
+                        content = parsed
+                    except Exception:
+                        # Leave as text; caller may use local tools to repair
+                        content = text
+                
+                result = AgentResult(
+                    content=content,
+                    usage=usage_data or {},
+                    model=definition.model,
+                    elapsed_ms=int((time.time() - start) * 1000),
+                    provider_metadata={},
+                    trace_id=opts.trace_id,
+                )
+            except ProviderError:
                 raise  # Re-raise provider errors as-is
             except Exception as e:
-                await events.emit_error(e)
                 config = get_config(definition.model)
                 provider = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
                 raise ProviderError(str(e), provider=provider)
-
-            text = "".join(collected)
-            content: Any = text
-            if definition.json_schema:
-                try:
-                    parsed = json.loads(text)
-                    validate_json_schema(parsed, definition.json_schema)
-                    content = parsed
-                except Exception:
-                    # Leave as text; caller may use local tools to repair
-                    content = text
-
-            result = AgentResult(
-                content=content,
-                usage=final_usage or {},
-                model=definition.model,
-                elapsed_ms=int((time.time() - start) * 1000),
-                provider_metadata={},
-                trace_id=opts.trace_id,
-            )
-            if final_usage is None:
-                await events.emit_usage({})
-            await events.emit_complete(result)
+            
             # Metrics (best-effort)
             if self.metrics_sink:
-                usage = final_usage or {}
+                usage = usage_data or {}
                 # Get provider from model config
                 config = get_config(definition.model)
                 # Create modern RequestMetrics

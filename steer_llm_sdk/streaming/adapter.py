@@ -454,10 +454,8 @@ class StreamAdapter:
             ))
     
     def _is_retryable_error(self, error: Exception) -> bool:
-        """Determine if error is retryable based on provider."""
-        # This is a simplified check - real implementation would use ErrorMapper
-        error_type = type(error).__name__
-        retryable_types = ["RateLimitError", "InternalServerError", "TimeoutError"]
-        return any(t in error_type for t in retryable_types)
+        """Determine if error is retryable using ErrorMapper."""
+        from ..providers.errors import ErrorMapper
+        return ErrorMapper.is_retryable(error)
 
 
