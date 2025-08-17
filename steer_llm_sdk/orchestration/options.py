@@ -86,6 +86,23 @@ class OrchestratorOptions(BaseModel):
         description="Additional metadata to pass to sub-agents"
     )
     
+    # M1 additions - Planning
+    quality_requirements: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Quality requirements for planning (e.g., min_confidence)"
+    )
+    
+    # M1 additions - Reliability
+    enable_circuit_breaker: bool = Field(
+        default=True,
+        description="Enable circuit breaker protection"
+    )
+    
+    enable_fallback: bool = Field(
+        default=True,
+        description="Enable fallback to alternative tools"
+    )
+    
     @field_validator('budget')
     def validate_budget(cls, v):
         """Validate budget structure."""

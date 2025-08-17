@@ -267,6 +267,28 @@ class MyBundleTool(BundleTool):
 - Python 3.10+ with asyncio support
 - Host applications implement domain-specific tools
 
+## M1 Features (Planning & Reliability)
+
+The enhanced orchestrator (`orchestrator_v2.py`) adds production-grade features:
+
+### Automatic Tool Selection
+- Rule-based planner selects appropriate tools
+- Considers request type, keywords, budget constraints
+- Respects circuit breaker states
+
+### Reliability Features
+- **Retry Logic**: Exponential backoff with configurable policies
+- **Circuit Breakers**: Per-provider protection against failures
+- **Fallback Tools**: Automatic failover to alternative tools
+- **Error Classification**: Intelligent retry decisions
+
+### Idempotency & Tracing
+- Request deduplication with conflict detection
+- Automatic trace/request ID generation and propagation
+- Per-tool idempotency keys
+
+See the [M1 Features Guide](./m1-features-guide.md) for detailed usage.
+
 ## M0 Implementation Notes
 
 ### Budget Semantics

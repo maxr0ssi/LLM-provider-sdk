@@ -17,6 +17,13 @@ from .errors import (
     BudgetExceeded,
     ConflictError
 )
+from .planning import (
+    Planner,
+    PlanningContext,
+    PlanningResult,
+    RuleBasedPlanner,
+    PlanningRule
+)
 
 __all__ = [
     # Core orchestration
@@ -43,4 +50,19 @@ __all__ = [
     "OrchestratorError",
     "BudgetExceeded",
     "ConflictError",
+    
+    # Planning
+    "Planner",
+    "PlanningContext",
+    "PlanningResult",
+    "RuleBasedPlanner",
+    "PlanningRule",
 ]
+
+# Import enhanced orchestrator for easier access
+try:
+    from .orchestrator_v2 import EnhancedOrchestrator
+    __all__.append("EnhancedOrchestrator")
+except ImportError:
+    # M1 features not available if dependencies missing
+    pass

@@ -123,6 +123,30 @@ class ToolRegistry:
             for name, tool in self._tools.items()
         }
     
+    def get_tool_metadata(self) -> Dict[str, "ToolMetadata"]:
+        """Get tool metadata for planning.
+        
+        Returns:
+            Dict mapping tool names to ToolMetadata objects
+        """
+        from .planning import ToolMetadata
+        
+        metadata = {}
+        for name, tool in self._tools.items():
+            # Extract metadata from tool attributes if available
+            tool_meta = ToolMetadata(
+                name=name,
+                version=tool.version,
+                description=tool.description if tool.description else None,
+                supported_models=getattr(tool, "supported_models", []),
+                default_options=getattr(tool, "default_options", {}),
+                capabilities=getattr(tool, "capabilities", []),
+                resource_requirements=getattr(tool, "resource_requirements", {})
+            )
+            metadata[name] = tool_meta
+        
+        return metadata
+    
     def has_tool(self, name: str) -> bool:
         """Check if a tool is registered.
         

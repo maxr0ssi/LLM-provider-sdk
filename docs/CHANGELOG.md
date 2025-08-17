@@ -20,6 +20,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive test coverage for new architecture
   - See [Orchestration Guide](./orchestration/overview.md) for usage
 
+- **Orchestration M1 Features**: Planning and reliability enhancements
+  - **Automatic Tool Selection**: Rule-based planner selects appropriate tools
+    - Type-based rules, keyword matching, budget-aware selection
+    - Circuit breaker state awareness in planning
+    - Fallback tool support with priority ordering
+  - **Reliability Features**: Production-grade error handling
+    - Retry with exponential backoff and jitter
+    - Per-provider circuit breakers with configurable thresholds
+    - Error classification for intelligent retry decisions
+    - Automatic fallback to alternative tools
+  - **Idempotency Support**: Request deduplication
+    - Conflict detection for same key with different payload
+    - Per-tool idempotency keys derived from request key
+    - Configurable TTL-based caching
+  - **Trace Propagation**: Distributed tracing support
+    - Automatic trace/request ID generation
+    - ID propagation through all layers
+    - Tool-level context preservation
+  - New `EnhancedOrchestrator` class with backward compatibility
+  - See [M1 Features Guide](./orchestration/m1-features-guide.md) for usage
+
 ## [0.3.1] - 2025-08-16
 ### Security
 - **BREAKING**: API keys are now passed directly to the `SteerLLMClient` constructor instead of being read from environment variables
