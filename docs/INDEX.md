@@ -38,6 +38,10 @@
 - [Custom Sinks](guides/custom-sinks.md) - Custom metrics collectors
 - [HTTP Endpoints](guides/http-endpoints.md) - REST API reference
 
+### Orchestration
+- [Overview](orchestration/overview.md) - Parallel agent execution
+- [Progress Tracker](orchestration/PROGRESS_TRACKER.md) - Implementation status
+
 ### Migration & Setup
 - [Streaming API Migration](guides/streaming-api-migration.md) - Upgrade to new streaming API
 - [Metrics Setup](guides/metrics-setup.md) - Configure observability

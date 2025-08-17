@@ -5,6 +5,21 @@ All notable changes to the Steer LLM SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- **Orchestration Module (M0/M0.5)**: Tool-based orchestration with Evidence Bundles
+  - New tool-based architecture where orchestrator delegates to registered tools
+  - Tool Registry for host applications to register domain-specific tools
+  - Evidence Bundle format with raw replicates + computed statistics
+  - Bundle tools handle parallel execution, validation, and analysis
+  - Built-in interfaces: `Tool`, `BundleTool`, `EvidenceBundle`
+  - Example `SimpleBundleTool` demonstrating the pattern
+  - Streaming events tagged with tool names and progress updates
+  - SDK client methods: `register_tool()` and `list_tools()`
+  - Tools internally use `runtime="openai_agents"` (no fallbacks)
+  - Comprehensive test coverage for new architecture
+  - See [Orchestration Guide](./orchestration/overview.md) for usage
+
 ## [0.3.1] - 2025-08-16
 ### Security
 - **BREAKING**: API keys are now passed directly to the `SteerLLMClient` constructor instead of being read from environment variables

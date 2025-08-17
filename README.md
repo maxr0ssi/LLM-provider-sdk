@@ -7,6 +7,7 @@ A production-ready Python SDK for integrating multiple Large Language Model (LLM
 - **🔄 Multi-Provider Support**: Seamless integration with OpenAI, Anthropic, and xAI
 - **🚀 Unified Streaming**: Consolidated streaming architecture with consistent behavior across providers
 - **🤖 Agent Infrastructure**: Native OpenAI Agents SDK integration with tools and structured outputs
+- **🎭 Orchestration**: Tool-based execution with Evidence Bundles and statistical analysis
 - **💰 Cost Optimization**: Built-in pricing calculations with cache-aware billing
 - **🛡️ Enterprise Reliability**: Circuit breakers, retry mechanisms, and idempotency support
 - **📊 Observability**: Comprehensive metrics, tracing, and performance monitoring
@@ -623,6 +624,44 @@ async for event in runner.stream(
 ```
 
 For more details, see the [Agent Runtime Integration Guide](docs/guides/agent-runtime-integration.md).
+
+### Orchestration (Tool-Based Execution)
+
+Execute complex operations through registered tools that handle parallel execution and analysis:
+
+```python
+from steer_llm_sdk import SteerLLMClient
+from steer_llm_sdk.orchestration import Orchestrator, OrchestratorOptions
+from my_app.tools import AnalysisBundleTool  # Your custom tool
+
+# Register tools at startup
+client = SteerLLMClient()
+client.register_tool(AnalysisBundleTool())
+
+# Execute via orchestrator
+orchestrator = Orchestrator()
+result = await orchestrator.run(
+    request={"query": "What are the implications of quantum computing?"},
+    tool_name="analysis_bundle",
+    tool_options={
+        "k": 3,  # Run 3 parallel replicates
+        "epsilon": 0.2  # Early stop threshold
+    },
+    options=OrchestratorOptions(
+        max_parallel=10,
+        streaming=True,
+        budget={"tokens": 2000}
+    )
+)
+
+# Access Evidence Bundle with statistics
+if "evidence_bundle" in result.content:
+    bundle = result.content["evidence_bundle"]
+    print(f"Confidence: {bundle['summary']['confidence']}")
+    print(f"Total tokens: {result.usage['total_tokens']}")
+```
+
+For more details, see the [Orchestration Guide](docs/orchestration/overview.md).
 
 ## Architecture
 

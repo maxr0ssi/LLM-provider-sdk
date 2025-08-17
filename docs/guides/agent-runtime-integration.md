@@ -1,5 +1,8 @@
 # Agent Runtime Integration Guide
 
+> This SDK is domain-neutral. Any role names or examples (e.g., "specialist", "scorer") are illustrative only.
+> MVP note: Phase M0 pins `runtime="openai_agents"` with no fallback. Runtimes remain pluggable for M1+ via adapters.
+
 This guide explains how to use the new agent runtime integration feature in the Steer LLM SDK, starting with OpenAI Agents SDK support.
 
 ## Overview
@@ -30,7 +33,7 @@ from steer_llm_sdk.agents import AgentRunner, AgentDefinition
 agent = AgentDefinition(
     system="You are a helpful assistant",
     user_template="Answer this question: {question}",
-    model="gpt-4o-mini",
+    model="openai:gpt-4o-mini",
     parameters={"temperature": 0.7, "max_tokens": 500}
 )
 
@@ -57,7 +60,7 @@ from steer_llm_sdk.agents import AgentRunner, AgentDefinition
 agent = AgentDefinition(
     system="You are a creative writer",
     user_template="Write a short story about: {topic}",
-    model="gpt-4o-mini",
+    model="openai:gpt-4o-mini",
     parameters={"temperature": 0.8, "max_tokens": 1000}
 )
 
@@ -93,7 +96,7 @@ The runtime supports JSON schema enforcement through OpenAI's Responses API:
 agent = AgentDefinition(
     system="Extract information from text",
     user_template="Extract key facts from: {text}",
-    model="gpt-4o-mini",
+    model="openai:gpt-4o-mini",
     json_schema={
         "type": "object",
         "properties": {
@@ -150,7 +153,7 @@ def calculate(expression: str) -> float:
 agent = AgentDefinition(
     system="You are a helpful math assistant",
     user_template="Help me with: {problem}",
-    model="gpt-4.1-mini",
+    model="openai:gpt-4.1-mini",
     tools=[
         Tool(
             name="calculate",
@@ -177,7 +180,7 @@ result = await runner.run(
 )
 ```
 
-## Deterministic Mode
+## Deterministic Mode (Semantics)
 
 For reproducible outputs:
 
@@ -193,7 +196,16 @@ result = await runner.run(
 )
 ```
 
-## Advanced Options
+- Seed propagation: when a provider does not support deterministic seeds, the SDK passes the seed but treats it as a no-op and emits a warning in logs/events.
+
+## Idempotency and Advanced Options
+
+### Idempotency Semantics
+
+The SDK enforces idempotency at the runner/orchestrator boundary:
+
+- Same `idempotency_key` + same payload → return stored result (upsert).
+- Same `idempotency_key` + different payload → raise conflict (HTTP 409 equivalent) with a structured error.
 
 ### Budget Constraints
 
@@ -211,7 +223,7 @@ result = await runner.run(
 )
 ```
 
-### Streaming Options
+### Streaming Options and Event Schema
 
 ```python
 from steer_llm_sdk.models.streaming import StreamingOptions
@@ -233,26 +245,17 @@ result = await runner.run(
 )
 ```
 
-### Request Tracking
+Minimal event schema:
 
-```python
-import uuid
+- `on_start`: `{ provider, model, request_id?, metadata? }`
+- `on_delta`: `{ delta: str | dict, is_json?: bool, chunk_index }`
+- `on_usage`: `{ usage: dict, is_estimated: bool, confidence?: float }`
+- `on_complete`: `{ total_chunks, duration_ms, final_usage?, metadata? }`
+- `on_error`: `{ error: { code, message, retriable? } }`
 
-result = await runner.run(
-    agent,
-    variables,
-    {
-        "runtime": "openai_agents",
-        "idempotency_key": "unique-request-123",
-        "trace_id": str(uuid.uuid4()),
-        "metadata": {
-            "request_id": str(uuid.uuid4())
-        }
-    }
-)
-```
+Security redaction hook: you may provide a callable to redact PII/secrets before events are emitted.
 
-## Error Handling
+## Error Handling and Status Model
 
 The runtime maps provider errors to normalized error types:
 
@@ -268,6 +271,9 @@ except ProviderError as e:
     if e.retry_after:
         print(f"Retry after: {e.retry_after} seconds")
 ```
+
+Standard status values: `accepted | running | succeeded | failed | partial`.
+Standardized error payload: `{ code, message, provider?, retriable? }`.
 
 ## Metrics and Observability
 
@@ -293,15 +299,13 @@ result = await runner.run(
 # Metrics automatically recorded with agent_runtime dimension
 ```
 
-
-
 ## Model Support
 
 The OpenAI Agents runtime works best with models that support advanced features:
 
-- **Full Support**: `gpt-4o-mini`, `gpt-4.1-mini`, `gpt-5-mini`, `gpt-4o`, `gpt-4.1`, `gpt-5`
-- **Partial Support**: `gpt-3.5-turbo` (no JSON schema)
-- **Special Models**: `o4-mini` (requires temperature=1.0)
+- **Full Support**: `openai:gpt-4o-mini`, `openai:gpt-4.1-mini`, `openai:gpt-5-mini`, `openai:gpt-4o`, `openai:gpt-4.1`, `openai:gpt-5`
+- **Partial Support**: `openai:gpt-3.5-turbo` (no JSON schema)
+- **Special Models**: `openai:o4-mini` (requires temperature=1.0)
 
 ## Performance Considerations
 

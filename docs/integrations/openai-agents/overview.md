@@ -5,6 +5,8 @@ This documentation defines the target for Phase 7: a first-class integration of 
 - Required package: `pip install steer-llm-sdk[openai-agents]`
 - Reference docs: [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/)
 
+> Provider-agnostic positioning: the SDK remains provider-agnostic. For MVP (Phase M0), the agent runtime is pinned to `openai_agents` with no fallback; additional runtimes remain pluggable for M1+.
+
 ## Intent and scope
 
 - Provide a dedicated Agents runtime that uses the OpenAI Agents SDK primitives (Agents, Runner, Tools, Sessions, Guardrails, Streaming, Tracing).
@@ -38,6 +40,21 @@ This documentation defines the target for Phase 7: a first-class integration of 
 - Complex multi-agent handoffs or external orchestration
 - Deep tracing integration (beyond basic IDs)
 - Heavy, production-grade metrics by default
+
+## Determinism and Idempotency Semantics
+
+- Determinism: when a `seed` is provided and the model supports it, the runtime forwards it; otherwise it is a no-op with a warning.
+- Idempotency: same `idempotency_key` + same payload → return stored result; with different payload → conflict (HTTP 409 equivalent) with structured error.
+
+## Streaming Event Schema (minimal)
+
+- `on_start`: `{ provider, model, request_id?, metadata? }`
+- `on_delta`: `{ delta: str | dict, is_json?: bool, chunk_index }`
+- `on_usage`: `{ usage: dict, is_estimated: bool, confidence?: float }`
+- `on_complete`: `{ total_chunks, duration_ms, final_usage?, metadata? }`
+- `on_error`: `{ error: { code, message, retriable? } }`
+
+A redaction hook can be installed to remove PII/secrets before events leave the process.
 
 ## Diagrams and flows
 
