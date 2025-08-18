@@ -5,6 +5,62 @@ All notable changes to the Steer LLM SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2025-08-18
+
+### Added
+- **Orchestration Module**: Production-ready tool-based orchestration system
+  - Tool Registry for host applications to register domain-specific tools
+  - Evidence Bundle format with raw replicates + computed statistics
+  - Bundle tools handle parallel execution, validation, and analysis
+  - Built-in interfaces: `Tool`, `BundleTool`, `EvidenceBundle`
+  - Example `SimpleBundleTool` demonstrating the pattern
+  - Streaming events tagged with tool names and progress updates
+  - SDK client methods: `register_tool()` and `list_tools()`
+  - Tools internally use `runtime="openai_agents"` (no fallbacks)
+  - Comprehensive test coverage for new architecture
+  - See [Orchestration Guide](./orchestration/overview.md) for usage
+
+- **Orchestration Planning & Reliability**: Production-grade enhancements
+  - **Automatic Tool Selection**: Rule-based planner selects appropriate tools
+    - Type-based rules, keyword matching, budget-aware selection
+    - Circuit breaker state awareness in planning
+    - Fallback tool support with priority ordering
+  - **Reliability Features**: Production-grade error handling
+    - Retry with exponential backoff and jitter
+    - Per-provider circuit breakers with configurable thresholds
+    - Error classification for intelligent retry decisions
+    - Automatic fallback to alternative tools
+  - **Idempotency Support**: Request deduplication
+    - Conflict detection for same key with different payload
+    - Per-tool idempotency keys derived from request key
+    - Configurable TTL-based caching
+  - **Trace Propagation**: Distributed tracing support
+    - Automatic trace/request ID generation
+    - ID propagation through all layers
+    - Tool-level context preservation
+  - New `ReliableOrchestrator` class with planning and reliability features
+  - See [Planning & Reliability Guide](./orchestration/planning-reliability-guide.md) for usage
+
+### Changed
+- **Orchestration Module - Major Cleanup**: Production-ready refactoring
+  - Removed all backwards compatibility and legacy code
+  - Eliminated milestone references (M0/M1/M2/M3)
+  - Renamed classes for professional naming:
+    - `EnhancedOrchestrator` → `ReliableOrchestrator`
+    - `OrchestratorOptions` → `OrchestrationConfig`
+    - `OrchestratorResult` → `OrchestrationOutput`
+    - `PlanningContext` → `PlanRequest`
+    - `PlanningResult` → `PlanDecision`
+    - `BundleMeta` → `BundleMetadata`
+    - `EnhancedRetryManager` → `AdvancedRetryManager`
+  - Renamed `orchestrator_v2.py` to `reliable_orchestrator.py`
+  - Created `BaseOrchestrator` to consolidate duplicate code
+  - Fixed IdempotencyManager interface (added async wrappers)
+  - Fixed retry backoff test expectations
+  - Fixed circuit breaker state mapping for planner
+  - All 32 orchestration tests now passing (100% success rate)
+  - See [CURRENT_STATE.md](./orchestration/CURRENT_STATE.md) for details
+
 ## [0.3.1] - 2025-08-16
 ### Security
 - **BREAKING**: API keys are now passed directly to the `SteerLLMClient` constructor instead of being read from environment variables

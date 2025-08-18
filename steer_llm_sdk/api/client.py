@@ -19,6 +19,7 @@ from ..streaming.helpers import StreamingHelper
 from ..streaming.adapter import StreamAdapter
 from ..observability import MetricsCollector, MetricsConfig, get_collector
 from ..observability.sinks import MetricsSink
+from ..orchestration.tool_registry import get_global_registry, Tool
 
 
 class SteerLLMClient:
@@ -319,6 +320,28 @@ class SteerLLMClient:
         """Check if a specific model is available."""
         from ..core.routing import check_lightweight_availability
         return check_lightweight_availability(model)
+    
+    def register_tool(self, tool: Tool) -> None:
+        """Register a tool for use by the orchestrator.
+        
+        Args:
+            tool: Tool instance to register
+            
+        Raises:
+            ValueError: If tool with same name already registered
+            TypeError: If tool doesn't implement Tool interface
+        """
+        registry = get_global_registry()
+        registry.register_tool(tool)
+    
+    def list_tools(self) -> Dict[str, Dict[str, str]]:
+        """List all registered tools.
+        
+        Returns:
+            Dict mapping tool names to their metadata
+        """
+        registry = get_global_registry()
+        return registry.list_tools()
 
 
 # Convenience function for quick usage
