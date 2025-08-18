@@ -17,11 +17,10 @@ See [CURRENT_STATE.md](./CURRENT_STATE.md) for detailed information about the cu
 
 ### Development Documentation
 - [CLEANUP_SUMMARY.md](./CLEANUP_SUMMARY.md) - Summary of cleanup changes
-- [orchestration-dev-phases.md](./orchestration-dev-phases.md) - Development history
 
 ### Tool Development
-- [Tool Development Guide](./tool-development-guide.md) - How to create custom tools
-- [Evidence Bundle Guide](./evidence-bundle-guide.md) - Working with evidence bundles
+- See [Overview](./overview.md) for tool development examples
+- See [Current State](./CURRENT_STATE.md) for Evidence Bundle details
 
 ## Quick Links
 
@@ -44,4 +43,4 @@ See [CURRENT_STATE.md](./CURRENT_STATE.md) for detailed information about the cu
 
 ## Support
 
-For questions or issues related to the orchestration module, please refer to the [main SDK documentation](../../README.md) or file an issue in the repository.
+For questions or issues related to the orchestration module, please refer to the main SDK documentation or file an issue in the repository.

@@ -1,7 +1,7 @@
 # Agent Runtime Integration Guide
 
 > This SDK is domain-neutral. Any role names or examples (e.g., "specialist", "scorer") are illustrative only.
-> MVP note: Phase M0 pins `runtime="openai_agents"` with no fallback. Runtimes remain pluggable for M1+ via adapters.
+> Note: Currently the runtime is pinned to `runtime="openai_agents"` with no fallback. Additional runtimes may be added in future releases via adapters.
 
 This guide explains how to use the new agent runtime integration feature in the Steer LLM SDK, starting with OpenAI Agents SDK support.
 

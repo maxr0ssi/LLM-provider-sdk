@@ -33,11 +33,11 @@ export RESPECT_RETRY_AFTER=true
 ### Custom Retry Policies
 
 ```python
-from steer_llm_sdk.reliability import EnhancedRetryManager, RetryPolicy
+from steer_llm_sdk.reliability import AdvancedRetryManager, RetryPolicy
 from steer_llm_sdk.reliability.error_classifier import ErrorCategory
 
 # Create custom retry policies per error type
-retry_manager = EnhancedRetryManager(
+retry_manager = AdvancedRetryManager(
     default_policy=RetryPolicy(max_attempts=3),
     category_policies={
         ErrorCategory.RATE_LIMIT: RetryPolicy(

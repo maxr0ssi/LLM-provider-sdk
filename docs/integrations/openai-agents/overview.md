@@ -5,7 +5,7 @@ This documentation defines the target for Phase 7: a first-class integration of 
 - Required package: `pip install steer-llm-sdk[openai-agents]`
 - Reference docs: [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/)
 
-> Provider-agnostic positioning: the SDK remains provider-agnostic. For MVP (Phase M0), the agent runtime is pinned to `openai_agents` with no fallback; additional runtimes remain pluggable for M1+.
+> Provider-agnostic positioning: the SDK remains provider-agnostic. The agent runtime is pinned to `openai_agents` with no fallback; additional runtimes remain pluggable for future releases.
 
 ## Intent and scope
 

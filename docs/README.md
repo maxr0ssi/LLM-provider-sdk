@@ -15,11 +15,13 @@ Welcome to the Steer LLM SDK documentation. This directory contains comprehensiv
 - [Configuration Guide](configuration/) - Provider and system setup
 
 ### Architecture
+- [Orchestration Architecture](architecture/orchestration.md) - Tool-based orchestration design
 - [Streaming Architecture](architecture/streaming.md) - Unified streaming design
 - [Layered Architecture](architecture/projects/layered-modular/) - System design and phases
 - [Metrics & Observability](architecture/metrics.md) - Monitoring and tracing
 
 ### Advanced Features
+- [Orchestration Guide](orchestration/) - Tool-based execution with reliability
 - [Agent Runtime](guides/agent-runtime-integration.md) - Building AI agents
 - [OpenAI Agents SDK](integrations/openai-agents/) - Native agent integration
 - [Responses API](guides/responses-api-advanced.md) - GPT-5 advanced features
@@ -31,6 +33,8 @@ Welcome to the Steer LLM SDK documentation. This directory contains comprehensiv
 
 ## Recent Updates
 
+- **v0.3.2** - Production-ready orchestration module with tool-based architecture
+- **v0.3.1** - API key security improvements
 - **v0.3.0** - Agent infrastructure, streaming consolidation, pre-release cleanup
 - **Streaming API Split** - New `stream_with_usage()` method ([migration guide](guides/streaming-api-migration.md))
 - **OpenAI Agents SDK** - Full integration with tools and structured outputs

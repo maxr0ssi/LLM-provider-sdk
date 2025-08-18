@@ -58,7 +58,6 @@ This document summarizes the comprehensive cleanup performed on the orchestratio
   - overview.md
   - planning-reliability-guide.md (renamed from m1-features-guide.md)
   - README.md
-  - orchestration-dev-phases.md
 
 ### 9. Final Verification (Phase 9)
 - Fixed remaining import errors

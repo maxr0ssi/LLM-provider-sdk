@@ -200,29 +200,29 @@ By centralizing LLM interactions, we ensure:
 export GITHUB_TOKEN=your_github_personal_access_token
 
 # Install base SDK
-pip install steer-llm-sdk --index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.1/
+pip install steer-llm-sdk --index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.2/
 
 # Or add to requirements.txt
---index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.1/
+--index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.2/
 steer-llm-sdk[openai-agents,tiktoken]
 ```
 
 ### Install from Source (Development)
 ```bash
 # Install base SDK
-pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2
 
 # Install with OpenAI Agents SDK support (for agent runtime features)
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1#egg=steer-llm-sdk[openai-agents]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2#egg=steer-llm-sdk[openai-agents]"
 
 # Install with token counting support
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1#egg=steer-llm-sdk[tiktoken]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2#egg=steer-llm-sdk[tiktoken]"
 
 # Install with HTTP API endpoints (requires FastAPI)
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1#egg=steer-llm-sdk[http]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2#egg=steer-llm-sdk[http]"
 
 # Install with all optional dependencies
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.1#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
 ```
 
 ### Local Development
@@ -813,6 +813,7 @@ For issues and questions:
 ## Documentation
 
 - **[Architecture Overview](docs/architecture/)**: Detailed system design and components
+- **[Orchestration Guide](docs/orchestration/)**: Tool-based orchestration with reliability features
 - **[Streaming Guide](docs/guides/streaming.md)**: Complete streaming implementation guide
 - **[Agent Development](docs/guides/agent-runtime-integration.md)**: Building agents with tools
 - **[HTTP API Reference](docs/guides/http-endpoints.md)**: REST API endpoints documentation
@@ -820,6 +821,15 @@ For issues and questions:
 - **[Metrics & Monitoring](docs/architecture/metrics.md)**: Observability setup
 
 ## Changelog
+
+### v0.3.2 (2025-08)
+- **Orchestration Module**: Production-ready tool-based orchestration
+  - Tool Registry for pluggable domain-specific tools
+  - Evidence Bundle format with statistical analysis
+  - Automatic tool selection with rule-based planner
+  - Reliability features: retry logic, circuit breakers, idempotency
+  - Clean architecture with no legacy code or technical debt
+  - All 32 orchestration tests passing (100% coverage)
 
 ### v0.3.1 (2025-08)
 - **Security**: API keys now passed directly to client instead of environment variables

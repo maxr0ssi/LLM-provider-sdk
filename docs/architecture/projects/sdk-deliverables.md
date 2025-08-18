@@ -1,7 +1,10 @@
-# SDK Deliverables (Nexus MVP)
+# SDK Deliverables
 
 ## Scope
-- **Purpose**: Provider‑agnostic, SDK‑only plumbing to define and run agents with structured outputs, optional streaming, and optional local deterministic tools.
+- **Purpose**: Provider‑agnostic SDK providing:
+  - Agent execution with structured outputs, streaming, and tools
+  - Tool-based orchestration with Evidence Bundles
+  - Production-grade reliability features
 - **Out of scope**: Steer business logic, OA orchestration, stage policies, K×D replication logic, rubric content.
 
 ## Objectives (MVP)
@@ -9,13 +12,16 @@
 - **Reliability**: Deterministic mode, strict JSON schema validation, idempotency.
 - **Observability**: Normalized usage, latency, request identifiers, event callbacks.
 
-## Capability Matrix (MVP)
+## Capability Matrix
 - **Structured output (JSON schema)**: yes
 - **Streaming deltas**: yes
 - **Tool calling (local deterministic only)**: optional
 - **Deterministic seed**: best‑effort; expose when provider supports
 - **Timeouts/budgets**: request‑level ms/token limits
 - **Retry & backoff**: typed transient retries with idempotency keys
+- **Orchestration**: tool-based execution with Evidence Bundles
+- **Reliability**: circuit breakers, advanced retry policies
+- **Planning**: automatic tool selection with fallbacks
 
 ## Core Interfaces (conceptual)
 - **AgentDefinition**
@@ -45,6 +51,14 @@
 
 - **StreamAdapter** (optional)
   - normalize provider deltas → { type, text/json_delta, usage_partial }
+
+- **Orchestration Interfaces**
+  - **Tool**: Base interface with name and execute() method
+  - **BundleTool**: Specialized for parallel execution with statistics
+  - **EvidenceBundle**: Raw replicates + computed statistics
+  - **Orchestrator**: Basic tool execution with streaming support
+  - **ReliableOrchestrator**: Adds planning, retry, circuit breakers
+  - **Tool Registry**: Global registry for tool discovery
 
 ## Responses API Mapping (OpenAI)
 - Request fields to support:
@@ -87,9 +101,17 @@
 - Phase 2: Streaming adapter + deterministic seed + idempotency
 - Phase 3: Local tool support (schema_repair, annotation_dedup) gated by flag
 - Phase 4: Additional providers (Anthropic, etc.) behind capability registry
+- Phase 5: Orchestration Layer
+  - Tool Registry and base orchestrator
+  - Evidence Bundle format and aggregation
+  - Planning system with rule-based selection
+  - Reliability features (retry, circuit breakers)
+  - Production-ready with comprehensive testing
 
 ## References
 - See `docs/nexus/agent-sdk-guide.md` for scaffolding and usage patterns.
 - See `docs/nexus/orchestrator-spec.md` for OA integration expectations.
+- See `docs/orchestration/overview.md` for orchestration architecture and usage.
+- See `docs/architecture/orchestration.md` for detailed orchestration design.
 
 

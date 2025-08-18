@@ -14,6 +14,18 @@ Define clear layers and contracts so we can easily add providers, models, on‑p
 | Public API Layer                               |
 | - SteerLLMClient (generate/stream/with_usage)  |
 | - Agent primitives (Definition/Runner/Tools)   |
+| - Tool registration (register_tool/list_tools)  |
+| - Orchestration API (Orchestrator/Reliable)     |
++-----------------------------------------------+
+              |
+              v
++-----------------------------------------------+
+| Orchestration Layer                            |
+| - Tool Registry & Discovery                    |
+| - Evidence Bundle aggregation                  |
+| - Planning & tool selection                    |
+| - Reliability (retry, circuit breakers)        |
+| - Idempotency & trace propagation             |
 +-----------------------------------------------+
               |
               v
@@ -77,7 +89,8 @@ Define clear layers and contracts so we can easily add providers, models, on‑p
 ```
 
 ### Layer goals and boundaries
-- **Public API Layer (SDK surface)**: Stable user‑facing APIs. No provider‑specific code here. Backward compatibility guaranteed for existing methods.
+- **Public API Layer (SDK surface)**: Stable user‑facing APIs. No provider‑specific code here. Backward compatibility guaranteed for existing methods. Includes tool registration and orchestration APIs.
+- **Orchestration Layer**: Manages complex multi-step operations. Tool registry, planning logic, reliability features, and Evidence Bundle aggregation. Provider-agnostic coordination.
 - **Decision & Normalization**: Data‑shape consistency. All parameters validated and mapped before hitting providers.
 - **Capability & Policy**: Behavior driven by capabilities, not if/else by model name. Determinism/budgets centralized.
 - **Routing**: Single place that selects provider adapter. No business logic.
@@ -105,6 +118,14 @@ Define clear layers and contracts so we can easily add providers, models, on‑p
   - `AgentRunner.run(definition, variables, options)` returns `AgentResult(content, usage, model, elapsed_ms, provider_metadata, trace_id)`
   - Streaming via callbacks (on_start, on_delta, on_usage, on_complete, on_error)
 
+- **Orchestration interfaces**
+  - `Tool`: Base interface with `name` property and `execute()` method
+  - `BundleTool`: Specialized tool for parallel execution with statistical analysis
+  - `EvidenceBundle`: Raw replicates + computed statistics (consensus, disagreements, confidence)
+  - `Orchestrator.run(request, tool_name?, options)` → `OrchestrationOutput`
+  - `ReliableOrchestrator`: Adds planning, retry logic, circuit breakers, idempotency
+  - Tool Registry: `client.register_tool(tool)`, `client.list_tools()`
+
 ### Extension playbooks
 - **Add a new provider**
   - Implement the Provider Adapter interface described above.
@@ -125,6 +146,13 @@ Define clear layers and contracts so we can easily add providers, models, on‑p
   - Create in an `integrations/` module outside core.
   - Map `AgentDefinition` → provider agent constructs; bridge streaming events; handle strict schema and determinism.
   - Keep as an optional dependency; document install and usage.
+
+- **Add a custom orchestration tool**
+  - Implement the `Tool` interface with `name` property and `execute()` method
+  - For parallel execution: extend `BundleTool` and implement `_execute_bundle()`
+  - Return `EvidenceBundle` with raw replicates and computed statistics
+  - Register tool: `client.register_tool(MyTool())`
+  - Tools internally use `runtime="openai_agents"` (no fallbacks)
 
 ### Parameter normalization rules (examples)
 - `max_tokens` vs `max_output_tokens`: consult capability; map accordingly.
