@@ -2,8 +2,8 @@
 
 from .planner import (
     Planner,
-    PlanningContext,
-    PlanningResult,
+    PlanRequest,
+    PlanDecision,
     ToolMetadata,
     ExecutionStrategy
 )
@@ -17,8 +17,8 @@ from .rule_based import (
 __all__ = [
     # Core interfaces
     "Planner",
-    "PlanningContext",
-    "PlanningResult",
+    "PlanRequest",
+    "PlanDecision",
     "ToolMetadata",
     "ExecutionStrategy",
     

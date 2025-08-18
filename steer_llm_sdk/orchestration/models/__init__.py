@@ -4,7 +4,7 @@ from .evidence_bundle import (
     EvidenceBundle,
     Replicate,
     ReplicateQuality,
-    BundleMeta,
+    BundleMetadata,
     BundleSummary,
     Disagreement
 )
@@ -13,7 +13,7 @@ __all__ = [
     "EvidenceBundle",
     "Replicate", 
     "ReplicateQuality",
-    "BundleMeta",
+    "BundleMetadata",
     "BundleSummary",
     "Disagreement"
 ]

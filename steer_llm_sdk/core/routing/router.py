@@ -11,7 +11,7 @@ from ...providers.openai.adapter import OpenAIProvider
 from ...providers.xai.adapter import XAIProvider
 from ...providers.base import ProviderError
 from ...reliability import (
-    EnhancedRetryManager, RetryPolicy, CircuitBreakerManager,
+    AdvancedRetryManager, RetryPolicy, CircuitBreakerManager,
     CircuitBreakerConfig, CircuitState, StreamingRetryManager, StreamingRetryConfig
 )
 from .selector import (
@@ -40,7 +40,7 @@ class LLMRouter:
         }
         
         # Initialize reliability components
-        self.retry_manager = EnhancedRetryManager(
+        self.retry_manager = AdvancedRetryManager(
             default_policy=RetryPolicy(
                 max_attempts=3,
                 initial_delay=0.5,

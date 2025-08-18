@@ -45,13 +45,13 @@ Notes:
 - Code: add new orchestration module (no core refactors)
   - Add directory: `steer_llm_sdk/orchestration/`
     - orchestrator.py — main coordinator (fan-out/fan-in). Responsibilities:
-      - Accept request, registry: list[SubAgentSpec], options: OrchestratorOptions, optional EventManager.
+      - Accept request, registry: list[SubAgentSpec], options: OrchestrationConfig, optional EventManager.
       - Launch sub-agents in parallel via asyncio.Semaphore(max_parallel) + asyncio.gather(return_exceptions=True).
       - For each sub-agent: call AgentRunner().run(definition, variables, {"runtime": "openai_agents", ...}) with per-agent budgets/timeouts/determinism propagated.
       - Aggregate AgentResult objects: sum usage; compute cost via existing calculate_exact_cost if usage present.
-      - Produce OrchestratorResult with content, usage_total, per_agent, cost_total_usd, elapsed_ms, status, errors?.
+      - Produce OrchestrationOutput with content, usage_total, per_agent, cost_total_usd, elapsed_ms, status, errors?.
     - registry.py — definitions for SubAgentSpec and helper lookups.
-    - options.py — OrchestratorOptions model (max_parallel, budgets, deterministic, streaming, retries, timeouts_ms, trace_id, request_id, redactor_cb?).
+    - options.py — OrchestrationConfig model (max_parallel, budgets, deterministic, streaming, retries, timeouts_ms, trace_id, request_id, redactor_cb?).
     - merger.py — content policy:
       - Text: append-only (ordered concat by priority or completion time).
       - JSON: deprecated for multi-JSON; only passthrough when exactly one JSON present (no multi-JSON merge).
@@ -143,7 +143,7 @@ Notes:
   - Reliability hooks:
     - In orchestrator.py, wrap each sub-agent run with existing RetryManager (bounded attempts, retryable errors only) and optional provider circuit breaker (map breaker key to model/provider).
   - Idempotency & tracing:
-    - Thread idempotency_key, trace_id, request_id into each AgentRunner.run invocation; surface in OrchestratorResult.
+    - Thread idempotency_key, trace_id, request_id into each AgentRunner.run invocation; surface in OrchestrationOutput.
 
 - Tests:
   - test_planner_selection.py — planner picks correct subset/order given request metadata.

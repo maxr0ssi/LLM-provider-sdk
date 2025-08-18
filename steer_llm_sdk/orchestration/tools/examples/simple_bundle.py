@@ -14,7 +14,7 @@ from ...models.evidence_bundle import (
     EvidenceBundle,
     Replicate,
     ReplicateQuality,
-    BundleMeta,
+    BundleMetadata,
     BundleSummary,
     Disagreement
 )
@@ -187,7 +187,7 @@ class SimpleBundleTool(BundleTool):
         
         # Create Evidence Bundle
         bundle = EvidenceBundle(
-            meta=BundleMeta(
+            meta=BundleMetadata(
                 task="simple_analysis",
                 k=options.k,
                 k_completed=len(replicates),

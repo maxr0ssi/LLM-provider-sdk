@@ -5,7 +5,7 @@ This layer handles:
 - Retry logic with exponential backoff
 - Idempotency key management
 - Token and time budget enforcement
-- Enhanced error classification
+- Advanced error classification
 - Circuit breaker pattern
 - Advanced retry policies
 """
@@ -18,7 +18,7 @@ from .retry import RetryManager
 from .idempotency import IdempotencyManager
 from .budget import clamp_params_to_budget
 from .error_classifier import ErrorClassifier, ErrorCategory, ErrorClassification
-from .enhanced_retry import EnhancedRetryManager, RetryPolicy, RetryState, RetryMetrics
+from .enhanced_retry import AdvancedRetryManager, RetryPolicy, RetryState, RetryMetrics
 from .circuit_breaker import (
     CircuitBreaker, CircuitBreakerConfig, CircuitState,
     CircuitStats, CircuitBreakerManager
@@ -33,7 +33,7 @@ __all__ = [
     "ErrorClassifier",
     "ErrorCategory",
     "ErrorClassification",
-    "EnhancedRetryManager",
+    "AdvancedRetryManager",
     "RetryPolicy",
     "RetryState",
     "RetryMetrics",

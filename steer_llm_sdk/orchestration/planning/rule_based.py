@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 import re
 from .planner import (
     Planner,
-    PlanningContext,
-    PlanningResult,
+    PlanRequest,
+    PlanDecision,
     ToolMetadata,
     ExecutionStrategy
 )
@@ -122,7 +122,7 @@ class PlanningRule:
     # Optional description
     description: Optional[str] = None
     
-    def matches(self, request: Dict[str, Any], context: Optional[PlanningContext] = None) -> bool:
+    def matches(self, request: Dict[str, Any], context: Optional[PlanRequest] = None) -> bool:
         """Check if all conditions match."""
         if not self.conditions:
             return True
@@ -153,10 +153,10 @@ class RuleBasedPlanner(Planner):
         self,
         request: Dict[str, Any],
         available_tools: Dict[str, ToolMetadata],
-        context: Optional[PlanningContext] = None
-    ) -> PlanningResult:
+        context: Optional[PlanRequest] = None
+    ) -> PlanDecision:
         """Plan tool execution based on rules."""
-        context = context or PlanningContext()
+        context = context or PlanRequest()
         
         # Find first matching rule
         for rule in self.rules:
@@ -193,7 +193,7 @@ class RuleBasedPlanner(Planner):
                 final_options = tool_metadata.default_options.copy()
                 final_options.update(tool_options)
                 
-                return PlanningResult(
+                return PlanDecision(
                     selected_tool=tool_name,
                     tool_options=final_options,
                     fallback_tools=result_dict.get("fallback_tools", []),
@@ -212,8 +212,8 @@ class RuleBasedPlanner(Planner):
         self,
         request: Dict[str, Any],
         available_tools: Dict[str, ToolMetadata],
-        context: PlanningContext
-    ) -> PlanningResult:
+        context: PlanRequest
+    ) -> PlanDecision:
         """Default planning when no rules match."""
         # Simple default: pick first available tool
         if not available_tools:
@@ -250,7 +250,7 @@ class RuleBasedPlanner(Planner):
             if "cost_usd" in context.budget and context.budget["cost_usd"] < 0.05:
                 final_options["k"] = 2
         
-        return PlanningResult(
+        return PlanDecision(
             selected_tool=tool_name,
             tool_options=final_options,
             fallback_tools=[name for name, _ in viable_tools[1:3]],  # Next 2 as fallbacks

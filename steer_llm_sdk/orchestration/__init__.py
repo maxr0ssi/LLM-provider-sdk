@@ -1,14 +1,14 @@
 """Orchestration module for tool-based execution."""
 
-from .orchestrator import Orchestrator, OrchestratorResult
-from .options import OrchestratorOptions
+from .orchestrator import Orchestrator, OrchestrationOutput
+from .options import OrchestrationConfig
 from .tool_registry import Tool, ToolRegistry, get_global_registry
 from .tools import BundleTool, BundleOptions
 from .models import (
     EvidenceBundle,
     Replicate,
     ReplicateQuality,
-    BundleMeta,
+    BundleMetadata,
     BundleSummary,
     Disagreement
 )
@@ -19,8 +19,8 @@ from .errors import (
 )
 from .planning import (
     Planner,
-    PlanningContext,
-    PlanningResult,
+    PlanRequest,
+    PlanDecision,
     RuleBasedPlanner,
     PlanningRule
 )
@@ -28,8 +28,8 @@ from .planning import (
 __all__ = [
     # Core orchestration
     "Orchestrator",
-    "OrchestratorResult",
-    "OrchestratorOptions",
+    "OrchestrationOutput",
+    "OrchestrationConfig",
     
     # Tool infrastructure
     "Tool",
@@ -42,7 +42,7 @@ __all__ = [
     "EvidenceBundle",
     "Replicate",
     "ReplicateQuality",
-    "BundleMeta",
+    "BundleMetadata",
     "BundleSummary",
     "Disagreement",
     
@@ -53,16 +53,12 @@ __all__ = [
     
     # Planning
     "Planner",
-    "PlanningContext",
-    "PlanningResult",
+    "PlanRequest",
+    "PlanDecision",
     "RuleBasedPlanner",
     "PlanningRule",
 ]
 
-# Import enhanced orchestrator for easier access
-try:
-    from .orchestrator_v2 import EnhancedOrchestrator
-    __all__.append("EnhancedOrchestrator")
-except ImportError:
-    # M1 features not available if dependencies missing
-    pass
+# Import reliability features
+from .reliable_orchestrator import ReliableOrchestrator
+__all__.append("ReliableOrchestrator")

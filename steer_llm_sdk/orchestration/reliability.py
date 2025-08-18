@@ -6,17 +6,16 @@ import logging
 from dataclasses import dataclass, field
 
 from ..reliability import (
-    EnhancedRetryManager,
+    AdvancedRetryManager,
     RetryPolicy,
-    RetryState,
     CircuitBreakerManager,
     CircuitBreakerConfig,
     ErrorClassifier,
     ErrorCategory
 )
-from ..reliability.circuit_breaker import CircuitBreakerState
+from ..reliability.circuit_breaker import CircuitState
 from ..providers.base import ProviderError
-from .errors import OrchestratorError, ConflictError
+from .errors import OrchestratorError, ConflictError, ToolExecutionError
 from .tool_registry import Tool
 
 logger = logging.getLogger(__name__)
@@ -25,7 +24,7 @@ T = TypeVar('T')
 
 
 @dataclass
-class OrchestratorReliabilityConfig:
+class ReliabilityConfig:
     """Configuration for orchestrator reliability features."""
     
     # Retry configuration
@@ -76,16 +75,15 @@ class ReliableToolExecutor:
     
     def __init__(
         self,
-        config: Optional[OrchestratorReliabilityConfig] = None,
-        retry_manager: Optional[EnhancedRetryManager] = None,
-        circuit_breaker_manager: Optional[CircuitBreakerManager] = None,
-        error_classifier: Optional[ErrorClassifier] = None
+        config: Optional[ReliabilityConfig] = None,
+        retry_manager: Optional[AdvancedRetryManager] = None,
+        circuit_breaker_manager: Optional[CircuitBreakerManager] = None
     ):
         """Initialize with reliability components."""
-        self.config = config or OrchestratorReliabilityConfig()
-        self.retry_manager = retry_manager or EnhancedRetryManager()
+        self.config = config or ReliabilityConfig()
+        self.retry_manager = retry_manager or AdvancedRetryManager()
         self.circuit_breaker_manager = circuit_breaker_manager or CircuitBreakerManager()
-        self.error_classifier = error_classifier or ErrorClassifier()
+        self._provider_cache: Dict[str, str] = {}
     
     async def execute_with_reliability(
         self,
@@ -148,9 +146,7 @@ class ReliableToolExecutor:
         
         # All attempts failed
         raise OrchestratorError(
-            f"All tool attempts failed. Primary error: {primary_error}",
-            code="ALL_TOOLS_FAILED",
-            is_retryable=False
+            f"All tool attempts failed. Primary error: {primary_error}"
         )
     
     async def _execute_single_tool(
@@ -168,63 +164,49 @@ class ReliableToolExecutor:
         breaker_key = f"{provider}:{tool.name}"
         breaker = self._get_or_create_breaker(breaker_key, provider)
         
-        # Check if circuit is open
-        if breaker.state == CircuitBreakerState.OPEN:
-            if not breaker.should_attempt():
-                raise OrchestratorError(
-                    f"Circuit breaker open for {breaker_key}",
-                    code="CIRCUIT_BREAKER_OPEN",
-                    is_retryable=True
-                )
-        
-        # Create retry state
-        retry_state = RetryState()
-        
-        # Execute with retry
-        async def execute_fn():
-            try:
+        # Execute with retry and circuit breaker
+        async def execute_with_breaker():
+            # The circuit breaker's call method will handle state checking
+            # and success/failure recording automatically
+            async def execute_fn():
                 result = await tool.execute(request, options, event_manager)
-                
-                # Record success
-                breaker.record_success()
                 
                 # Extract provider from result if available
                 if isinstance(result, dict) and "provider" in result:
                     self._update_tool_provider_mapping(tool.name, result["provider"])
                 
                 return result
-                
+            
+            # Use circuit breaker's call method
+            return await breaker.call(execute_fn)
+        
+        # Wrap in retry logic
+        async def retry_wrapper():
+            try:
+                return await execute_with_breaker()
             except Exception as e:
                 # Classify error
                 category = self._classify_error(e)
                 
-                # Record failure
-                breaker.record_failure()
-                
-                # Determine if retryable
-                if self._should_retry(e, category, retry_state):
-                    # Record attempt
-                    retry_state.add_attempt(e, 0, category)
+                # Determine if retryable based on category
+                if self.config.retry_policy.should_retry_category(category):
                     raise
                 else:
                     # Non-retryable error
-                    raise OrchestratorError(
-                        str(e),
-                        code=category.value,
-                        is_retryable=False
+                    raise ToolExecutionError(
+                        tool.name,
+                        e,
+                        is_retryable=False,
+                        metadata={"error_category": category.value}
                     ) from e
         
         # Apply retry logic
-        try:
-            return await self.retry_manager.execute_with_retry(
-                execute_fn,
-                self.config.retry_policy,
-                retry_state=retry_state
-            )
-        except Exception as e:
-            # Ensure we always record the failure
-            breaker.record_failure()
-            raise
+        return await self.retry_manager.execute_with_retry(
+            retry_wrapper,
+            request_id=options.get('request_id', f'{tool.name}_{id(request)}'),
+            provider=provider,
+            policy=self.config.retry_policy
+        )
     
     def _get_tool_provider(self, tool: Tool, options: Dict[str, Any]) -> str:
         """Determine provider for a tool."""
@@ -256,41 +238,19 @@ class ReliableToolExecutor:
     def _classify_error(self, error: Exception) -> ErrorCategory:
         """Classify error using error classifier."""
         if isinstance(error, ProviderError):
-            return self.error_classifier.classify_provider_error(
-                error.provider,
-                error
+            classification = ErrorClassifier.classify_error(
+                error,
+                error.provider
             )
+            return classification.category
         else:
-            # Generic classification
-            return self.error_classifier.classify_error(
-                str(error),
-                getattr(error, "status_code", None)
+            # Generic classification - use "unknown" provider
+            classification = ErrorClassifier.classify_error(
+                error,
+                "unknown"
             )
+            return classification.category
     
-    def _should_retry(
-        self,
-        error: Exception,
-        category: ErrorCategory,
-        retry_state: RetryState
-    ) -> bool:
-        """Determine if error should be retried."""
-        # Check if category is retryable
-        if not self.config.retry_policy.should_retry_category(category):
-            return False
-        
-        # Check attempt limits
-        if retry_state.attempts >= self.config.retry_policy.max_attempts:
-            return False
-        
-        # Check time limits
-        if retry_state.get_duration() >= self.config.retry_policy.max_total_delay:
-            return False
-        
-        # Check error-specific retryability
-        if hasattr(error, "is_retryable"):
-            return error.is_retryable
-        
-        return True
     
     def _is_retryable_error(self, error: Exception) -> bool:
         """Quick check if error is potentially retryable."""
@@ -305,9 +265,6 @@ class ReliableToolExecutor:
         if hasattr(error, "retry_state") and error.retry_state:
             return error.retry_state.attempts
         return 1
-    
-    # Provider mapping cache
-    _provider_cache: Dict[str, str] = {}
     
     def _update_tool_provider_mapping(self, tool_name: str, provider: str):
         """Update cached tool to provider mapping."""

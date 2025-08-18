@@ -6,11 +6,11 @@ from typing import Dict, Any, Optional
 
 from steer_llm_sdk.orchestration import (
     Orchestrator,
-    OrchestratorOptions,
+    OrchestrationConfig,
     Tool,
     get_global_registry,
     EvidenceBundle,
-    BundleMeta,
+    BundleMetadata,
     BundleSummary,
     Replicate,
     ReplicateQuality
@@ -76,7 +76,7 @@ class MockBundleTool(Tool):
         ]
         
         return EvidenceBundle(
-            meta=BundleMeta(
+            meta=BundleMetadata(
                 task="test",
                 k=2,
                 model="mock-model",
@@ -167,8 +167,9 @@ class TestToolBasedOrchestration:
         assert "evidence_bundle" in result.content
         assert result.usage == {"total_tokens": 250}
         assert result.cost_usd == 0.001
-        assert result.metadata["confidence"] == 0.85
-        assert result.metadata["replicate_count"] == 2
+        # Metadata now only contains bundle_meta, tool info, and tracing
+        assert "bundle_meta" in result.metadata
+        assert result.metadata["tool_name"] == "mock_bundle"
     
     @pytest.mark.asyncio
     async def test_orchestrator_tool_not_found(self):
@@ -197,7 +198,7 @@ class TestToolBasedOrchestration:
             request="test",
             tool_name="options_test",
             tool_options={"custom": "value"},
-            options=OrchestratorOptions(
+            options=OrchestrationConfig(
                 max_parallel=5,
                 budget={"tokens": 1000},
                 trace_id="trace123"
@@ -239,7 +240,7 @@ class TestToolBasedOrchestration:
         result = await orchestrator.run(
             request="test",
             tool_name="streaming_test",
-            options=OrchestratorOptions(streaming=True),
+            options=OrchestrationConfig(streaming=True),
             event_manager=event_manager
         )
         
@@ -273,7 +274,7 @@ class TestToolBasedOrchestration:
             await orchestrator.run(
                 request="test",
                 tool_name="slow_tool",
-                options=OrchestratorOptions(timeout_ms=100)  # 100ms timeout
+                options=OrchestrationConfig(timeout_ms=100)  # 100ms timeout
             )
         
         assert "BudgetExceeded" in str(type(exc_info.value))

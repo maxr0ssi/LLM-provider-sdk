@@ -132,7 +132,7 @@ class BundleSummary(BaseModel):
     )
 
 
-class BundleMeta(BaseModel):
+class BundleMetadata(BaseModel):
     """Metadata about the bundle execution."""
     
     task: str = Field(
@@ -188,7 +188,7 @@ class EvidenceBundle(BaseModel):
     orchestrator to reason over in a single atomic context.
     """
     
-    meta: BundleMeta = Field(
+    meta: BundleMetadata = Field(
         ...,
         description="Metadata about bundle execution"
     )

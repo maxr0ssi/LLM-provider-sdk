@@ -11,14 +11,15 @@ from typing import List, Dict, Any, Optional, Union
 from pydantic import BaseModel, Field
 
 from ..streaming.manager import EventManager
+from .base import BaseOrchestrator
 from .tool_registry import get_global_registry
-from .options import OrchestratorOptions
+from .options import OrchestrationConfig
 from .streaming import OrchestratorEventManager
 from .models.evidence_bundle import EvidenceBundle
 from .errors import BudgetExceeded, ConflictError, OrchestratorError
 
 
-class OrchestratorResult(BaseModel):
+class OrchestrationOutput(BaseModel):
     """Result from orchestrator execution."""
     
     content: Union[str, Dict[str, Any]] = Field(
@@ -67,7 +68,7 @@ class OrchestratorResult(BaseModel):
     )
 
 
-class Orchestrator:
+class Orchestrator(BaseOrchestrator):
     """Orchestrates execution through registered tools.
     
     The orchestrator is responsible for:
@@ -80,6 +81,7 @@ class Orchestrator:
     
     def __init__(self):
         """Initialize orchestrator."""
+        super().__init__()
         self.registry = get_global_registry()
     
     async def run(
@@ -87,9 +89,9 @@ class Orchestrator:
         request: Union[str, Dict[str, Any]],
         tool_name: str,
         tool_options: Optional[Dict[str, Any]] = None,
-        options: Optional[OrchestratorOptions] = None,
+        options: Optional[OrchestrationConfig] = None,
         event_manager: Optional[EventManager] = None
-    ) -> OrchestratorResult:
+    ) -> OrchestrationOutput:
         """Execute a tool and return the result.
         
         Args:
@@ -108,7 +110,7 @@ class Orchestrator:
             ConflictError: If idempotency conflict occurs
         """
         start_time = time.time()
-        options = options or OrchestratorOptions()
+        options = options or OrchestrationConfig()
         
         # Get the tool
         tool = self.registry.get_tool(tool_name)
@@ -123,10 +125,8 @@ class Orchestrator:
         
         # Emit orchestration start
         if options.streaming and event_manager:
-            await orch_events.emit_orchestrator_start(
-                tool_name=tool_name,
-                tool_version=tool.version,
-                request_id=options.request_id
+            await self._emit_start_event(
+                orch_events, tool_name, tool.version, options.request_id
             )
         
         # Prepare request
@@ -190,15 +190,12 @@ class Orchestrator:
             
             # Emit error event
             if options.streaming and event_manager:
-                await orch_events.emit_orchestrator_error(
-                    tool_name=tool_name,
-                    error=error_info,
-                    elapsed_ms=elapsed_ms,
-                    request_id=options.request_id
+                await self._emit_error_event(
+                    orch_events, tool_name, e, elapsed_ms, options.request_id
                 )
             
             # Return error result
-            return OrchestratorResult(
+            return OrchestrationOutput(
                 content={"error": error_info},
                 usage={},
                 cost_usd=None,
@@ -207,13 +204,7 @@ class Orchestrator:
                 per_agent={},
                 status="failed",
                 errors={tool_name: error_info},
-                metadata={
-                    'tool_name': tool_name,
-                    'tool_version': tool.version,
-                    'trace_id': options.trace_id,
-                    'request_id': options.request_id,
-                    'budget': options.budget
-                }
+                metadata=self._build_metadata(tool_name, tool.version, options)
             )
         
         # Process tool result
@@ -227,28 +218,16 @@ class Orchestrator:
         
         # Emit orchestration complete
         if options.streaming and event_manager:
-            await orch_events.emit_orchestrator_complete(
-                tool_name=tool_name,
-                tool_version=tool.version,
-                elapsed_ms=elapsed_ms,
-                usage=usage,
-                request_id=options.request_id
+            await self._emit_complete_event(
+                orch_events, tool_name, tool.version, elapsed_ms, usage, options.request_id
             )
         
         # Build final metadata
-        final_metadata = {
-            'tool_name': tool_name,
-            'tool_version': tool.version,
-            'trace_id': options.trace_id,
-            'request_id': options.request_id,
-            **metadata
-        }
+        final_metadata = self._build_metadata(
+            tool_name, tool.version, options, metadata
+        )
         
-        # Add budget to metadata for auditability
-        if options.budget:
-            final_metadata['budget'] = options.budget
-        
-        return OrchestratorResult(
+        return OrchestrationOutput(
             content=content,
             usage=usage,
             cost_usd=cost,
@@ -259,99 +238,4 @@ class Orchestrator:
             errors=None,
             metadata=final_metadata
         )
-    
-    def _process_tool_result(
-        self,
-        tool_result: Any
-    ) -> tuple[Any, Dict[str, Any], Optional[float], Dict[str, Any]]:
-        """Process result from a tool.
-        
-        Args:
-            tool_result: Result from tool execution
-            
-        Returns:
-            Tuple of (content, usage, cost, metadata)
-        """
-        # Handle Evidence Bundle
-        if isinstance(tool_result, EvidenceBundle):
-            # Extract content from Evidence Bundle
-            content = {
-                "evidence_bundle": {
-                    "meta": tool_result.meta.model_dump(),
-                    "replicates": [r.model_dump() for r in tool_result.replicates],
-                    "summary": tool_result.summary.model_dump()
-                }
-            }
-            
-            usage = tool_result.usage_total or {}
-            cost = tool_result.cost_total_usd
-            
-            metadata = {
-                "bundle_meta": tool_result.meta.model_dump(),
-                "replicate_count": len(tool_result.replicates),
-                "confidence": tool_result.summary.confidence,
-                "early_stopped": tool_result.meta.early_stopped
-            }
-            
-            if tool_result.metadata:
-                metadata.update(tool_result.metadata)
-                
-        # Handle dict results
-        elif isinstance(tool_result, dict):
-            content = tool_result
-            usage = tool_result.get("usage", {})
-            cost = tool_result.get("cost_usd")
-            metadata = tool_result.get("metadata", {})
-            
-        # Handle string results
-        elif isinstance(tool_result, str):
-            content = tool_result
-            usage = {}
-            cost = None
-            metadata = {}
-            
-        else:
-            # Fallback for other types
-            content = str(tool_result)
-            usage = {}
-            cost = None
-            metadata = {"result_type": type(tool_result).__name__}
-        
-        return content, usage, cost, metadata
-    
-    
-    def _check_budget(
-        self,
-        budget: Dict[str, Any],
-        usage: Dict[str, Any],
-        cost: Optional[float],
-        start_time: float
-    ) -> None:
-        """Check if budget limits are exceeded.
-        
-        Args:
-            budget: Budget configuration
-            usage: Total usage
-            cost: Total cost
-            start_time: Start timestamp
-            
-        Raises:
-            BudgetExceeded: If any budget limit is exceeded
-        """
-        # Check time budget
-        if 'ms' in budget:
-            elapsed_ms = (time.time() - start_time) * 1000
-            if elapsed_ms > budget['ms']:
-                raise BudgetExceeded('time', budget['ms'], elapsed_ms)
-        
-        # Check token budget
-        if 'tokens' in budget:
-            total_tokens = usage.get('total_tokens', 0)
-            if total_tokens > budget['tokens']:
-                raise BudgetExceeded('tokens', budget['tokens'], total_tokens)
-        
-        # Check cost budget
-        if 'cost_usd' in budget and cost is not None:
-            if cost > budget['cost_usd']:
-                raise BudgetExceeded('cost', budget['cost_usd'], cost)
     

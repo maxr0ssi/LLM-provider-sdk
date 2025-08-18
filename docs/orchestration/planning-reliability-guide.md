@@ -1,10 +1,10 @@
-# M1 Features Guide - Planning and Reliability
+# Planning and Reliability Guide
 
-This guide covers the M1 features added to the orchestration system: automatic tool selection, retry logic, circuit breakers, and idempotency.
+This guide covers the planning and reliability features in the orchestration system: automatic tool selection, retry logic, circuit breakers, and idempotency.
 
 ## Overview
 
-M1 enhances the orchestrator with production-grade reliability features:
+The enhanced orchestrator provides production-grade reliability features:
 - **Planning**: Automatic tool selection based on request attributes
 - **Retry Logic**: Exponential backoff with configurable policies
 - **Circuit Breakers**: Provider-level protection against cascading failures
@@ -16,11 +16,11 @@ M1 enhances the orchestrator with production-grade reliability features:
 ### Basic Usage
 
 ```python
-from steer_llm_sdk.orchestration.orchestrator_v2 import EnhancedOrchestrator
-from steer_llm_sdk.orchestration import OrchestratorOptions
+from steer_llm_sdk.orchestration import ReliableOrchestrator
+from steer_llm_sdk.orchestration import OrchestrationConfig
 
 # Create enhanced orchestrator with default configuration
-orchestrator = EnhancedOrchestrator()
+orchestrator = ReliableOrchestrator()
 
 # Let the planner select the appropriate tool
 result = await orchestrator.run(
@@ -28,7 +28,7 @@ result = await orchestrator.run(
         "type": "analysis",
         "query": "Analyze the market trends"
     },
-    options=OrchestratorOptions(
+    options=OrchestrationConfig(
         idempotency_key="analysis-123",
         trace_id="trace-456"
     )
@@ -88,7 +88,7 @@ planner = RuleBasedPlanner([
     )
 ])
 
-orchestrator = EnhancedOrchestrator(planner=planner)
+orchestrator = ReliableOrchestrator(planner=planner)
 ```
 
 ### Custom Planning Rules
@@ -126,10 +126,10 @@ planner.add_rule(high_quality_rule)
 The planner considers context when selecting tools:
 
 ```python
-from steer_llm_sdk.orchestration.planning import PlanningContext
+from steer_llm_sdk.orchestration.planning import PlanRequest
 
 # Provide context for planning decisions
-context = PlanningContext(
+context = PlanRequest(
     budget={"tokens": 5000, "cost_usd": 0.50},
     quality_requirements={"min_confidence": 0.9},
     circuit_breaker_states={
@@ -142,7 +142,7 @@ context = PlanningContext(
 # Planner will avoid circuit-broken tools
 result = await orchestrator.run(
     request="Analyze this",
-    options=OrchestratorOptions(
+    options=OrchestrationConfig(
         quality_requirements={"min_confidence": 0.9}
     )
 )
@@ -179,7 +179,7 @@ reliability_config = OrchestratorReliabilityConfig(
     )
 )
 
-orchestrator = EnhancedOrchestrator(
+orchestrator = ReliableOrchestrator(
     reliability_config=reliability_config
 )
 ```
@@ -248,7 +248,7 @@ Prevent duplicate processing of requests:
 result1 = await orchestrator.run(
     request="Process payment for order 123",
     tool_name="payment_processor",
-    options=OrchestratorOptions(
+    options=OrchestrationConfig(
         idempotency_key="payment-order-123"
     )
 )
@@ -257,7 +257,7 @@ result1 = await orchestrator.run(
 result2 = await orchestrator.run(
     request="Process payment for order 123",
     tool_name="payment_processor",
-    options=OrchestratorOptions(
+    options=OrchestrationConfig(
         idempotency_key="payment-order-123"
     )
 )
@@ -273,7 +273,7 @@ The system detects when the same idempotency key is used with different requests
 # First request
 await orchestrator.run(
     request="Process payment for $100",
-    options=OrchestratorOptions(
+    options=OrchestrationConfig(
         idempotency_key="payment-123"
     )
 )
@@ -282,7 +282,7 @@ await orchestrator.run(
 try:
     await orchestrator.run(
         request="Process payment for $200",  # Different amount!
-        options=OrchestratorOptions(
+        options=OrchestrationConfig(
             idempotency_key="payment-123"
         )
     )
@@ -315,7 +315,7 @@ class RedisIdempotencyManager(IdempotencyManager):
         )
 
 # Use custom manager
-orchestrator = EnhancedOrchestrator(
+orchestrator = ReliableOrchestrator(
     idempotency_manager=RedisIdempotencyManager(redis_client)
 )
 ```
@@ -342,7 +342,7 @@ Provide IDs for distributed tracing:
 # Explicit IDs for tracing
 result = await orchestrator.run(
     request="Analyze data",
-    options=OrchestratorOptions(
+    options=OrchestrationConfig(
         trace_id="trace-123",      # Distributed trace ID
         request_id="req-456"       # Unique request ID
     )
@@ -354,11 +354,11 @@ result = await orchestrator.run(
 
 ## Complete Example
 
-Here's a complete example using all M1 features:
+Here's a complete example using all planning and reliability features:
 
 ```python
-from steer_llm_sdk.orchestration.orchestrator_v2 import EnhancedOrchestrator
-from steer_llm_sdk.orchestration import OrchestratorOptions
+from steer_llm_sdk.orchestration import ReliableOrchestrator
+from steer_llm_sdk.orchestration import OrchestrationConfig
 from steer_llm_sdk.orchestration.planning import (
     RuleBasedPlanner,
     create_type_based_rule,
@@ -396,7 +396,7 @@ reliability_config = OrchestratorReliabilityConfig(
 )
 
 # Create orchestrator
-orchestrator = EnhancedOrchestrator(
+orchestrator = ReliableOrchestrator(
     planner=planner,
     reliability_config=reliability_config
 )
@@ -410,7 +410,7 @@ result = await orchestrator.run(
             "priority": "urgent"
         }
     },
-    options=OrchestratorOptions(
+    options=OrchestrationConfig(
         idempotency_key="sentiment-analysis-2024-01",
         trace_id="distributed-trace-789",
         request_id="request-abc-123",
@@ -494,7 +494,7 @@ event_manager = EventManager(on_delta=on_delta)
 
 result = await orchestrator.run(
     request="Test",
-    options=OrchestratorOptions(streaming=True),
+    options=OrchestrationConfig(streaming=True),
     event_manager=event_manager
 )
 ```
@@ -509,7 +509,7 @@ To migrate from the base orchestrator to the enhanced version:
    from steer_llm_sdk.orchestration import Orchestrator
    
    # New
-   from steer_llm_sdk.orchestration.orchestrator_v2 import EnhancedOrchestrator
+   from steer_llm_sdk.orchestration import ReliableOrchestrator
    ```
 
 2. **Tool Selection**:

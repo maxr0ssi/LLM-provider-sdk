@@ -12,7 +12,7 @@ import logging
 import time
 import os
 
-from .enhanced_retry import EnhancedRetryManager
+from .enhanced_retry import AdvancedRetryManager
 from .state import StreamState
 from ..providers.base import ProviderError
 from ..reliability.error_classifier import ErrorClassifier, ErrorCategory
@@ -39,11 +39,11 @@ class StreamingRetryManager:
     """
     Handles retry logic for streaming connections.
     
-    Works in conjunction with EnhancedRetryManager to provide
+    Works in conjunction with AdvancedRetryManager to provide
     streaming-specific retry capabilities.
     """
     
-    def __init__(self, retry_manager: EnhancedRetryManager):
+    def __init__(self, retry_manager: AdvancedRetryManager):
         self.retry_manager = retry_manager
         self.stream_states: Dict[str, StreamState] = {}
         self._state_ttl_seconds: float = float(os.getenv('STEER_STREAMING_STATE_TTL', '900'))  # 15 minutes default

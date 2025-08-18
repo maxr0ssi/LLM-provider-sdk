@@ -25,7 +25,7 @@ class ToolMetadata(BaseModel):
     resource_requirements: Dict[str, Any] = Field(default_factory=dict)
 
 
-class PlanningContext(BaseModel):
+class PlanRequest(BaseModel):
     """Context information for planning decisions."""
     budget: Optional[Dict[str, Any]] = None
     quality_requirements: Optional[Dict[str, Any]] = None
@@ -37,7 +37,7 @@ class PlanningContext(BaseModel):
         arbitrary_types_allowed = True
 
 
-class PlanningResult(BaseModel):
+class PlanDecision(BaseModel):
     """Result of planning process."""
     selected_tool: str
     tool_options: Dict[str, Any] = Field(default_factory=dict)
@@ -58,8 +58,8 @@ class Planner(ABC):
         self,
         request: Dict[str, Any],
         available_tools: Dict[str, ToolMetadata],
-        context: Optional[PlanningContext] = None
-    ) -> PlanningResult:
+        context: Optional[PlanRequest] = None
+    ) -> PlanDecision:
         """
         Plan which tool(s) to execute based on the request.
         

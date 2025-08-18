@@ -1,5 +1,5 @@
 """
-Enhanced retry manager with advanced features.
+Retry manager with advanced features.
 
 This module extends the basic RetryManager with:
 - Request-specific retry state tracking
@@ -118,7 +118,7 @@ class RetryMetrics:
         return successes / total if total > 0 else 0.0
 
 
-class EnhancedRetryManager:
+class AdvancedRetryManager:
     """
     Advanced retry manager with policy support.
     

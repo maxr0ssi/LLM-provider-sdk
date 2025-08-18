@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any, Callable, Awaitable
 from pydantic import BaseModel, Field, field_validator
 
 
-class OrchestratorOptions(BaseModel):
+class OrchestrationConfig(BaseModel):
     """Options for orchestrator execution."""
     
     # Concurrency control
@@ -86,13 +86,13 @@ class OrchestratorOptions(BaseModel):
         description="Additional metadata to pass to sub-agents"
     )
     
-    # M1 additions - Planning
+    # Planning options
     quality_requirements: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Quality requirements for planning (e.g., min_confidence)"
     )
     
-    # M1 additions - Reliability
+    # Reliability options
     enable_circuit_breaker: bool = Field(
         default=True,
         description="Enable circuit breaker protection"

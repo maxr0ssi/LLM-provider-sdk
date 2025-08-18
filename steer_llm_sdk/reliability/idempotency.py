@@ -32,5 +32,14 @@ class IdempotencyManager:
         to_delete = [k for k, (ts, _) in self._store.items() if now - ts > self.ttl]
         for k in to_delete:
             self._store.pop(k, None)
+    
+    # Async wrappers for orchestrator compatibility
+    async def get(self, key: str) -> Optional[Any]:
+        """Async wrapper for check_duplicate to match expected interface."""
+        return self.check_duplicate(key)
+    
+    async def store(self, key: str, value: Any) -> None:
+        """Async wrapper for store_result to match expected interface."""
+        self.store_result(key, value)
 
 

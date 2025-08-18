@@ -631,7 +631,7 @@ Execute complex operations through registered tools that handle parallel executi
 
 ```python
 from steer_llm_sdk import SteerLLMClient
-from steer_llm_sdk.orchestration import Orchestrator, OrchestratorOptions
+from steer_llm_sdk.orchestration import Orchestrator, OrchestrationConfig
 from my_app.tools import AnalysisBundleTool  # Your custom tool
 
 # Register tools at startup
@@ -647,7 +647,7 @@ result = await orchestrator.run(
         "k": 3,  # Run 3 parallel replicates
         "epsilon": 0.2  # Early stop threshold
     },
-    options=OrchestratorOptions(
+    options=OrchestrationConfig(
         max_parallel=10,
         streaming=True,
         budget={"tokens": 2000}

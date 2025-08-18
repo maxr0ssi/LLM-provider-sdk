@@ -1,4 +1,4 @@
-"""Enhanced orchestrator with planning and reliability features (M1).
+"""Orchestrator with planning and reliability features.
 
 This module extends the base orchestrator with:
 - Automatic tool selection via planner
@@ -17,28 +17,29 @@ logger = logging.getLogger(__name__)
 
 from ..streaming.manager import EventManager
 from ..reliability.idempotency import IdempotencyManager
-from .orchestrator import Orchestrator, OrchestratorResult
+from .orchestrator import Orchestrator, OrchestrationOutput
+from .base import BaseOrchestrator
 from .tool_registry import get_global_registry
-from .options import OrchestratorOptions
+from .options import OrchestrationConfig
 from .streaming import OrchestratorEventManager
 from .models.evidence_bundle import EvidenceBundle
 from .errors import BudgetExceeded, ConflictError, OrchestratorError
 from .planning import (
     Planner,
-    PlanningContext,
-    PlanningResult,
+    PlanRequest,
+    PlanDecision,
     RuleBasedPlanner
 )
 from .reliability import (
-    OrchestratorReliabilityConfig,
+    ReliabilityConfig,
     ReliableToolExecutor
 )
 
 
-class EnhancedOrchestrator(Orchestrator):
+class ReliableOrchestrator(Orchestrator):
     """Orchestrator with planning and reliability features.
     
-    This extends the base orchestrator with M1 features:
+    This extends the base orchestrator with:
     - Automatic tool selection using a planner
     - Retry logic with exponential backoff
     - Circuit breaker protection per provider
@@ -49,7 +50,7 @@ class EnhancedOrchestrator(Orchestrator):
     def __init__(
         self,
         planner: Optional[Planner] = None,
-        reliability_config: Optional[OrchestratorReliabilityConfig] = None,
+        reliability_config: Optional[ReliabilityConfig] = None,
         idempotency_manager: Optional[IdempotencyManager] = None
     ):
         """Initialize enhanced orchestrator.
@@ -65,7 +66,7 @@ class EnhancedOrchestrator(Orchestrator):
         self.planner = planner or RuleBasedPlanner()
         
         # Reliability
-        self.reliability_config = reliability_config or OrchestratorReliabilityConfig()
+        self.reliability_config = reliability_config or ReliabilityConfig()
         self.reliable_executor = ReliableToolExecutor(self.reliability_config)
         
         # Idempotency
@@ -76,9 +77,9 @@ class EnhancedOrchestrator(Orchestrator):
         request: Union[str, Dict[str, Any]],
         tool_name: Optional[str] = None,
         tool_options: Optional[Dict[str, Any]] = None,
-        options: Optional[OrchestratorOptions] = None,
+        options: Optional[OrchestrationConfig] = None,
         event_manager: Optional[EventManager] = None
-    ) -> OrchestratorResult:
+    ) -> OrchestrationOutput:
         """Execute with planning and reliability.
         
         Args:
@@ -97,7 +98,7 @@ class EnhancedOrchestrator(Orchestrator):
             ConflictError: If idempotency conflict occurs
         """
         start_time = time.time()
-        options = options or OrchestratorOptions()
+        options = options or OrchestrationConfig()
         
         # Generate IDs if not provided
         if not options.request_id:
@@ -113,16 +114,19 @@ class EnhancedOrchestrator(Orchestrator):
                 )
                 if cached_result:
                     # Verify payload matches
-                    if cached_result.get("request") != request:
+                    cached_request = cached_result.get("request")
+                    if cached_request != request:
                         raise ConflictError(
-                            f"Idempotency key '{options.idempotency_key}' "
-                            "used with different request"
+                            options.idempotency_key,
+                            f"used with different request"
                         )
                     return cached_result["result"]
+            except ConflictError:
+                # Re-raise conflict errors
+                raise
             except Exception as e:
-                if not isinstance(e, ConflictError):
-                    # Log but continue if idempotency check fails
-                    logger.warning(f"Idempotency check failed: {e}")
+                # Log but continue if idempotency check fails
+                logger.warning(f"Idempotency check failed: {e}")
         
         # Prepare request dict
         if isinstance(request, str):
@@ -174,10 +178,8 @@ class EnhancedOrchestrator(Orchestrator):
         
         # Emit orchestration start
         if options.streaming and event_manager:
-            await orch_events.emit_orchestrator_start(
-                tool_name=tool_name,
-                tool_version=tool.version,
-                request_id=options.request_id
+            await self._emit_start_event(
+                orch_events, tool_name, tool.version, options.request_id
             )
         
         # Merge tool options with orchestrator options
@@ -231,15 +233,12 @@ class EnhancedOrchestrator(Orchestrator):
             
             # Emit error event
             if options.streaming and event_manager:
-                await orch_events.emit_orchestrator_error(
-                    tool_name=tool_name,
-                    error=error_info,
-                    elapsed_ms=elapsed_ms,
-                    request_id=options.request_id
+                await self._emit_error_event(
+                    orch_events, tool_name, e, elapsed_ms, options.request_id
                 )
             
             # Return error result
-            return OrchestratorResult(
+            return OrchestrationOutput(
                 content={"error": error_info},
                 usage={},
                 cost_usd=None,
@@ -248,13 +247,7 @@ class EnhancedOrchestrator(Orchestrator):
                 per_agent={},
                 status="failed",
                 errors={tool_name: error_info},
-                metadata={
-                    'tool_name': tool_name,
-                    'tool_version': tool.version,
-                    'trace_id': options.trace_id,
-                    'request_id': options.request_id,
-                    'budget': options.budget
-                }
+                metadata=self._build_metadata(tool_name, tool.version, options)
             )
         
         # Process tool result
@@ -268,29 +261,17 @@ class EnhancedOrchestrator(Orchestrator):
         
         # Emit orchestration complete
         if options.streaming and event_manager:
-            await orch_events.emit_orchestrator_complete(
-                tool_name=tool_name,
-                tool_version=tool.version,
-                elapsed_ms=elapsed_ms,
-                usage=usage,
-                request_id=options.request_id
+            await self._emit_complete_event(
+                orch_events, tool_name, tool.version, elapsed_ms, usage, options.request_id
             )
         
         # Build final metadata
-        final_metadata = {
-            'tool_name': tool_name,
-            'tool_version': tool.version,
-            'trace_id': options.trace_id,
-            'request_id': options.request_id,
-            **metadata
-        }
-        
-        # Add budget to metadata for auditability
-        if options.budget:
-            final_metadata['budget'] = options.budget
+        final_metadata = self._build_metadata(
+            tool_name, tool.version, options, metadata
+        )
         
         # Build result
-        result = OrchestratorResult(
+        result = OrchestrationOutput(
             content=content,
             usage=usage,
             cost_usd=cost,
@@ -321,8 +302,8 @@ class EnhancedOrchestrator(Orchestrator):
     async def _plan_execution(
         self,
         request: Dict[str, Any],
-        options: OrchestratorOptions
-    ) -> PlanningResult:
+        options: OrchestrationConfig
+    ) -> PlanDecision:
         """Plan tool execution using the planner.
         
         Args:
@@ -333,7 +314,7 @@ class EnhancedOrchestrator(Orchestrator):
             PlanningResult with selected tool and options
         """
         # Build planning context
-        context = PlanningContext(
+        context = PlanRequest(
             budget=options.budget,
             quality_requirements=options.quality_requirements,
             # Get circuit breaker states
@@ -358,10 +339,14 @@ class EnhancedOrchestrator(Orchestrator):
         """
         states = {}
         
-        # Get all breakers from the manager
-        breakers = self.reliable_executor.circuit_breaker_manager.get_all_breakers()
+        # Get all breaker stats from the manager
+        stats = self.reliable_executor.circuit_breaker_manager.get_all_stats()
         
-        for key, breaker in breakers.items():
-            states[key] = breaker.state.value
+        for key, stat in stats.items():
+            states[key] = stat['state']
+            # Also add tool name mapping for backward compatibility
+            if ':' in key:
+                _, tool_name = key.split(':', 1)
+                states[tool_name] = stat['state']
         
         return states

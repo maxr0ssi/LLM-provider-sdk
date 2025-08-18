@@ -1,6 +1,15 @@
 # Orchestration Overview
 
-The orchestration module provides a tool-based architecture for executing complex operations. Instead of directly managing sub-agents, the orchestrator delegates to registered tools that encapsulate domain-specific logic, parallel execution, and statistical analysis.
+The orchestration module provides a tool-based architecture for executing complex LLM operations with advanced reliability features. The module uses a clean, production-ready design where orchestrators delegate to registered tools that encapsulate domain-specific logic, parallel execution, and statistical analysis.
+
+## Key Features
+
+- **Tool-Based Architecture**: Modular design with pluggable tools
+- **Automatic Planning**: Smart tool selection based on request characteristics
+- **Reliability Features**: Retry logic, circuit breakers, and idempotency
+- **Evidence Bundles**: Statistical analysis of parallel executions
+- **Streaming Support**: Real-time event streaming for long operations
+- **Budget Management**: Token and cost constraints
 
 ## Quick Start
 
@@ -26,7 +35,7 @@ print(client.list_tools())
 ### 2. Execute Tools via Orchestrator
 
 ```python
-from steer_llm_sdk.orchestration import Orchestrator, OrchestratorOptions
+from steer_llm_sdk.orchestration import Orchestrator, OrchestrationConfig
 
 # Create orchestrator
 orchestrator = Orchestrator()
@@ -40,7 +49,7 @@ result = await orchestrator.run(
         "epsilon": 0.2,  # Early stop threshold
         "schema_uri": "https://schemas.example.com/feasibility.json"
     },
-    options=OrchestratorOptions(
+    options=OrchestrationConfig(
         max_parallel=10,
         budget={"tokens": 2000, "cost_usd": 0.10},
         streaming=True
@@ -53,6 +62,41 @@ if "evidence_bundle" in result.content:
     print(f"Confidence: {bundle['summary']['confidence']}")
     print(f"Disagreements: {bundle['summary']['disagreements']}")
     print(f"Total cost: ${result.cost_usd:.4f}")
+```
+
+## Orchestrator Types
+
+The module provides two orchestrator implementations:
+
+### 1. Basic Orchestrator
+- Direct tool execution without planning
+- Suitable when you know which tool to use
+- Supports all core features (streaming, budgets, timeouts)
+
+```python
+from steer_llm_sdk.orchestration import Orchestrator
+
+orchestrator = Orchestrator()
+result = await orchestrator.run(
+    request="Analyze this",
+    tool_name="analyzer_tool"  # Explicit tool selection
+)
+```
+
+### 2. Reliable Orchestrator
+- Automatic tool selection via planner
+- Built-in reliability features (retry, circuit breakers)
+- Idempotency support for distributed systems
+- Recommended for production use
+
+```python
+from steer_llm_sdk.orchestration import ReliableOrchestrator
+
+orchestrator = ReliableOrchestrator()
+result = await orchestrator.run(
+    request={"type": "analysis", "data": "..."}
+    # No tool specified - planner selects best tool
+)
 ```
 
 ## Key Features
@@ -267,9 +311,9 @@ class MyBundleTool(BundleTool):
 - Python 3.10+ with asyncio support
 - Host applications implement domain-specific tools
 
-## M1 Features (Planning & Reliability)
+## Planning & Reliability Features
 
-The enhanced orchestrator (`orchestrator_v2.py`) adds production-grade features:
+The enhanced orchestrator (`reliable_orchestrator.py`) adds production-grade features:
 
 ### Automatic Tool Selection
 - Rule-based planner selects appropriate tools
@@ -287,13 +331,13 @@ The enhanced orchestrator (`orchestrator_v2.py`) adds production-grade features:
 - Automatic trace/request ID generation and propagation
 - Per-tool idempotency keys
 
-See the [M1 Features Guide](./m1-features-guide.md) for detailed usage.
+See the [Planning & Reliability Guide](./planning-reliability-guide.md) for detailed usage.
 
-## M0 Implementation Notes
+## Implementation Notes
 
 ### Budget Semantics
 
-In M0, budgets are **post-run checks only**. The orchestrator:
+Budgets are **post-run checks only**. The orchestrator:
 - Does NOT divide budgets among sub-agents
 - Does NOT preemptively stop agents based on budget
 - Checks budgets AFTER all agents complete
@@ -305,18 +349,17 @@ In M0, budgets are **post-run checks only**. The orchestrator:
 result = await orchestrator.run(
     request,
     agents,
-    OrchestratorOptions(budget={"tokens": 1000})
+    OrchestrationConfig(budget={"tokens": 1000})
 )
 # result.metadata['budget'] will contain {"tokens": 1000}
 ```
 
 ### Idempotency Behavior
 
-M0 implements basic idempotency:
+The orchestrator implements idempotency with:
 - Each sub-agent gets a unique key: `{orchestrator_key}_{agent_name}`
-- Conflict detection is delegated to individual sub-agents
-- No orchestrator-level conflict detection in M0
-- Full conflict detection planned for M1
+- Full conflict detection at orchestrator level (with planning & reliability features)
+- Conflict detection also delegated to individual sub-agents
 
 ### Error Contract
 
@@ -339,5 +382,5 @@ Error codes:
 ## See Also
 
 - [Progress Tracker](./PROGRESS_TRACKER.md) - Implementation status
-- [Technical Design](./technical-design.md) - Detailed architecture (M1)
-- [Usage Examples](./usage.md) - Advanced patterns (M3)
+- [Technical Design](./technical-design.md) - Detailed architecture
+- [Usage Examples](./usage.md) - Advanced patterns
