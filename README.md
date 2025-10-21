@@ -58,6 +58,10 @@ response = await client.generate("Explain AI", model="grok-3-mini")
 - Performance monitoring
 - Pluggable sinks for any monitoring system
 
+## Requirements
+
+- Python 3.11+ (3.10 not supported because pipe operators > Optional[T])
+
 ## Installation
 
 ```bash
