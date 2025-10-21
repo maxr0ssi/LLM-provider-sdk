@@ -1,14 +1,32 @@
-PROPRIETARY SOFTWARE LICENSE
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
 
-Copyright (c) 2024 Steer AI. All rights reserved.
+Copyright (C) 2024 Max Rossi
 
-This software and associated documentation files (the "Software") are the
-proprietary and confidential property of Steer AI.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-NOTICE: This is proprietary software. Unauthorized copying, modification,
-distribution, or use of this Software is strictly prohibited.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-The Software may only be used by authorized personnel of Steer AI or
-parties who have entered into a valid license agreement with Steer AI.
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-For licensing inquiries, please contact: legal@steer.ai
+ADDITIONAL TERMS UNDER GNU GPL VERSION 3 SECTION 7
+
+The following additional terms apply to this software:
+
+1. Attribution Requirement: Any use of this software must prominently display:
+   "Built with LLM Provider SDK by Max Rossi (https://github.com/maxr0ssi/LLM-provider-sdk)"
+
+2. Open Source Requirement: Any software that incorporates, is based on, or
+   derives from this SDK must also be released under the GNU GPL v3 or later.
+
+3. Network Use: If the software is used to provide a network service, the
+   complete source code must be made available to users of that service.
+
+For the complete GPL v3 license text, see: https://www.gnu.org/licenses/gpl-3.0.html

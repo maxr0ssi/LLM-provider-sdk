@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Steer LLM SDK provides automatic cost calculation for all API calls based on token usage and model-specific pricing. All pricing is centrally configured in the SDK to ensure accurate billing and rate limiting.
+The LLM Provider SDK provides automatic cost calculation for all API calls based on token usage and model-specific pricing. All pricing is centrally configured in the SDK to ensure accurate billing and rate limiting.
 
 ## Pricing Structure
 
@@ -109,6 +109,6 @@ for model_id, config in models.items():
 ### Cache Pricing
 Models that support caching typically charge 10-50% of regular input prices for cached tokens.
 
-## Internal Development Note
+## Pricing Overrides
 
-Pricing configuration is managed internally by the SDK maintainers. For SDK development and testing purposes only, pricing overrides can be enabled with proper authorization. This feature is not available for general use to ensure accurate billing and rate limiting in production environments like SteerQA.
+For development and testing purposes, pricing overrides can be configured through environment variables or configuration files. See the README for details on how to set custom pricing.

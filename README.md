@@ -1,860 +1,310 @@
-# Steer LLM SDK
+# LLM Provider SDK
 
-A production-ready Python SDK for integrating multiple Large Language Model (LLM) providers with enterprise-grade features including intelligent routing, unified streaming, agent infrastructure, and comprehensive observability.
+**One SDK to rule them all.** I built this because I was tired of rewriting LLM integrations for every new project. This SDK is my solution - a single, reusable package that handles all the complexity of working with multiple LLM providers.
+
+Write once, use everywhere. Any model, any provider, same clean interface.
+
+## The Problem I Solved
+
+Every time I started a new project that needed LLM capabilities, I faced the same challenges:
+- Writing boilerplate code for each provider (OpenAI, Anthropic, xAI)
+- Handling streaming differently for each provider's quirks  
+- Rewriting retry logic and error handling
+- Managing API keys and costs separately
+- Building the same tool-calling patterns over and over
+
+**This SDK is my answer:** A battle-tested, production-ready package that I can drop into any project and immediately have access to any LLM I want, with all the infrastructure already built.
+
+## What This Gives You
+
+- **Instant access** to GPT-4, Claude, Grok, and more - switch models with one parameter
+- **Unified interface** - learn once, use with any provider
+- **Production-ready** from day one - retries, circuit breakers, and error handling included
+- **No more rewriting** - tools, agents, and streaming patterns ready to use
 
 ## Key Features
 
-- **🔄 Multi-Provider Support**: Seamless integration with OpenAI, Anthropic, and xAI
-- **🚀 Unified Streaming**: Consolidated streaming architecture with consistent behavior across providers
-- **🤖 Agent Infrastructure**: Native OpenAI Agents SDK integration with tools and structured outputs
-- **🎭 Orchestration**: Tool-based execution with Evidence Bundles and statistical analysis
-- **💰 Cost Optimization**: Built-in pricing calculations with cache-aware billing
-- **🛡️ Enterprise Reliability**: Circuit breakers, retry mechanisms, and idempotency support
-- **📊 Observability**: Comprehensive metrics, tracing, and performance monitoring
-- **⚡ High Performance**: Async-first design with connection pooling and streaming optimizations
-- **🔧 Extensible**: Plugin architecture for custom providers and observability sinks
-
-## Architecture Overview
-
-The SDK implements a layered architecture designed for scalability and maintainability:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Application Layer                     │
-│  (SteerLLMClient, Agent Runner, HTTP API)               │
-├─────────────────────────────────────────────────────────┤
-│                    Streaming Layer                       │
-│  (StreamingHelper, EventProcessor, StreamAdapter)       │
-├─────────────────────────────────────────────────────────┤
-│                    Routing Layer                         │
-│  (LLMRouter, Circuit Breakers, Retry Manager)          │
-├─────────────────────────────────────────────────────────┤
-│                    Provider Layer                        │
-│  (OpenAI, Anthropic, xAI Adapters)                     │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Core Components
-
-- **Routing Layer**: Intelligent request routing with circuit breakers and retry logic
-- **Streaming Layer**: Unified streaming pipeline with event processing and normalization
-- **Provider Layer**: Normalized interfaces for each LLM provider
-- **Observability Layer**: Metrics collection, distributed tracing, and performance monitoring
-- **Agent Layer**: Advanced agent capabilities with tool execution and structured outputs
-
-## Overview
-
-### API Key Configuration (v0.3.1+)
-
-For improved security, API keys should be passed directly to the client instead of using environment variables:
-
+### 🔄 One Interface, All Providers
 ```python
-from steer_llm_sdk import SteerLLMClient
-
-# Recommended: Pass API keys directly
-client = SteerLLMClient(
-    openai_api_key="your-openai-key",
-    anthropic_api_key="your-anthropic-key", 
-    xai_api_key="your-xai-key"
-)
-
-# Backward compatible: Use environment variables
-# client = SteerLLMClient()  # Will read from OPENAI_API_KEY, etc.
+# Same code works with any model
+response = await client.generate("Explain AI", model="gpt-4o-mini")
+response = await client.generate("Explain AI", model="claude-3-haiku-20240307")  
+response = await client.generate("Explain AI", model="grok-3-mini")
 ```
 
-### Streaming API (Updated)
+### 🚀 Streaming That Just Works
+- Unified streaming that handles each provider's quirks
+- Consistent behavior across OpenAI, Anthropic, and xAI
+- Built-in usage tracking and cost calculation
 
-We have split the streaming API to provide a clean, scalable contract:
+### 🔧 Build Complex Workflows Once
+- Sequential tool calling for multi-step operations
+- Agent infrastructure with OpenAI Agents SDK
+- Reusable patterns for common tasks
 
-- `SteerLLMClient.stream(...)` is a pure async generator that yields text chunks. It no longer accepts `return_usage`.
-- `SteerLLMClient.stream_with_usage(...)` is an awaitable that returns a wrapper with full text and usage metadata after streaming completes.
-- `SteerLLMClient.generate(...)` returns a `GenerationResponse` object.
-- Convenience function `steer_llm_sdk.api.client.generate(...)` returns just the generated text (`str`).
+### 💰 Track Everything Automatically
+- Real-time cost calculation across all providers
+- Token usage tracking with cache awareness
+- Configurable pricing overrides
 
-#### Quick examples
+### 🛡️ Production-Ready Infrastructure
+- Circuit breakers per provider
+- Intelligent retry with exponential backoff
+- Idempotency support for safe retries
+- Comprehensive error handling
 
-Async generator streaming (preferred for high-throughput):
-
-```python
-from steer_llm_sdk import SteerLLMClient
-
-client = SteerLLMClient()
-async for chunk in client.stream("Hello", model="gpt-4o-mini", max_tokens=64):
-    print(chunk, end="")
-```
-
-Awaitable streaming with usage summary:
-
-```python
-from steer_llm_sdk import SteerLLMClient
-
-client = SteerLLMClient()
-resp = await client.stream_with_usage(
-    messages="Tell a 10-word joke",
-    model="gpt-4o-mini",
-    max_tokens=64,
-)
-
-print(resp.get_text())
-print(resp.usage)  # {prompt_tokens, completion_tokens, total_tokens, cache_info}
-```
-
-Object vs. text responses:
-
-```python
-from steer_llm_sdk import SteerLLMClient
-from steer_llm_sdk.api.client import generate as text_generate
-
-client = SteerLLMClient()
-obj = await client.generate("Hello", model="gpt-4o-mini")  # GenerationResponse
-print(obj.text)
-
-txt = await text_generate("Hello", model="gpt-4o-mini")   # str
-print(txt)
-```
-
-### Migration notes (Return type and streaming split)
-
-If you previously used `stream(..., return_usage=True)`, migrate to `stream_with_usage(...)`.
-
-Before:
-
-```python
-response = await client.stream("Hello", model="gpt-4o-mini", return_usage=True)
-print(response.get_text())
-print(response.usage)
-```
-
-After:
-
-```python
-response = await client.stream_with_usage("Hello", model="gpt-4o-mini")
-print(response.get_text())
-print(response.usage)
-```
-
-If you previously expected `str` from `client.generate(...)`, switch to the convenience function or use `.text`:
-
-Before:
-
-```python
-txt = await client.generate("Hello")  # str
-```
-
-After (Option A – convenience):
-
-```python
-from steer_llm_sdk.api.client import generate
-txt = await generate("Hello")  # str
-```
-
-After (Option B – object):
-
-```python
-obj = await client.generate("Hello")  # GenerationResponse
-txt = obj.text
-```
-
-Deprecation timeline:
-
-- Passing `return_usage` to `stream(...)` is deprecated and will raise in a future minor release.
-- Use `stream_with_usage(...)` immediately for usage summaries.
-
-
-The Steer LLM SDK is the foundational AI integration layer for the Steer ecosystem. It provides:
-
-- **Unified Interface**: Single API for multiple LLM providers
-- **Intelligent Routing**: Automatic provider selection based on model availability
-- **Model Registry**: Centralized configuration for all supported models
-- **Cost Tracking**: Built-in usage and cost calculation
-- **Async Support**: Full async/await support for all operations
-- **Streaming**: Real-time streaming responses
-- **Conversation Management**: Native support for multi-turn conversations
-- **Agent Runtime**: Native OpenAI Agents SDK integration with tools and structured outputs
-
-## Role in Steer Ecosystem
-
-This SDK serves as the core LLM abstraction layer for all Steer products and services:
-
-- **Steer Platform**: Powers all AI features in the main application
-- **Control Game**: Provides LLM capabilities for game mechanics and AI agents
-- **Future Services**: Foundation for any AI-powered features across Steer products
-
-By centralizing LLM interactions, we ensure:
-- Consistent AI behavior across all products
-- Simplified provider management and switching
-- Unified cost tracking and optimization
-- Single point of updates for new models and providers
-
-> Nexus Integration Brief: The Nexus agent‑mesh docs now live in this repo under `docs/nexus/`. The SDK’s role is SDK‑only plumbing for agents: Responses API mapping (GPT‑5 mini preferred), structured outputs via JSON schema, optional streaming, optional local deterministic tool hooks, determinism/idempotency, and metrics. See `docs/nexus/sdk-deliverables.md` for concrete deliverables and `docs/nexus/agent-sdk-guide.md` for usage patterns.
+### 📊 Built-in Observability
+- Metrics collection and tracing
+- Performance monitoring
+- Pluggable sinks for any monitoring system
 
 ## Installation
 
-### Requirements
-- Python 3.10 or higher
-- API keys for the providers you want to use
-
-### Install from GitHub Package Registry (Private Package)
 ```bash
-# Configure GitHub authentication
-export GITHUB_TOKEN=your_github_personal_access_token
+# Basic installation
+pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git
 
-# Install base SDK
-pip install steer-llm-sdk --index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.2/
+# With agent support
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git#egg=steer-llm-sdk[openai-agents]"
 
-# Or add to requirements.txt
---index-url https://${GITHUB_TOKEN}@github.com/maxr0ssi/LLM-provider-sdk/releases/download/v0.3.2/
-steer-llm-sdk[openai-agents,tiktoken]
+# With everything
+pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
 ```
-
-### Install from Source (Development)
-```bash
-# Install base SDK
-pip install git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2
-
-# Install with OpenAI Agents SDK support (for agent runtime features)
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2#egg=steer-llm-sdk[openai-agents]"
-
-# Install with token counting support
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2#egg=steer-llm-sdk[tiktoken]"
-
-# Install with HTTP API endpoints (requires FastAPI)
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2#egg=steer-llm-sdk[http]"
-
-# Install with all optional dependencies
-pip install "git+https://github.com/maxr0ssi/LLM-provider-sdk.git@v0.3.2#egg=steer-llm-sdk[openai-agents,tiktoken,http]"
-```
-
-### Local Development
-```bash
-git clone https://github.com/maxr0ssi/LLM-provider-sdk.git
-cd LLM-provider-sdk
-pip install -e .
-```
-
-## Configuration
-
-Set your API keys as environment variables:
-
-```bash
-export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"
-export XAI_API_KEY="your-xai-key"
-```
-
-Or use a `.env` file:
-```env
-OPENAI_API_KEY=your-openai-key
-ANTHROPIC_API_KEY=your-anthropic-key
-XAI_API_KEY=your-xai-key
-```
-
-### Streaming Configuration
-
-The SDK provides comprehensive streaming configuration options:
-
-```python
-from steer_llm_sdk.models.streaming import StreamingOptions, JSON_MODE_OPTIONS
-
-# Use preset configurations
-response = await client.stream_with_usage(
-    "Generate JSON data",
-    model="gpt-4",
-    response_format={"type": "json_object"},
-    streaming_options=JSON_MODE_OPTIONS  # Optimized for JSON
-)
-
-# Or create custom options
-options = StreamingOptions(
-    enable_usage_aggregation=True,     # Track token usage
-    enable_json_stream_handler=True,   # Handle JSON streaming
-    connection_timeout=5.0,            # Connection timeout in seconds
-    read_timeout=30.0,                 # Read timeout in seconds
-    retry_on_connection_error=True,    # Retry on connection errors
-    max_reconnect_attempts=3           # Maximum retry attempts
-)
-```
-
-For detailed streaming configuration options, see the [Streaming Configuration Guide](docs/configuration/streaming.md).
 
 ## Quick Start
 
-### Basic Usage
-
-```python
-from steer_llm_sdk import generate
-
-# Simple generation (async)
-response = await generate(
-    "Explain quantum computing in simple terms",
-    "gpt-4o-mini"
-)
-print(response)
-```
-
-### Using the Client
+### Initialize Once, Use Everywhere
 
 ```python
 from steer_llm_sdk import SteerLLMClient
 
-# Create client
-client = SteerLLMClient()
+# Set up your client with all your API keys
+client = SteerLLMClient(
+    openai_api_key="your-openai-key",
+    anthropic_api_key="your-anthropic-key",
+    xai_api_key="your-xai-key"
+)
+```
 
-# Generate text
+### Generate Text with Any Model
+
+```python
+# Pick any model - the interface stays the same
 response = await client.generate(
     "Write a haiku about programming",
-    "claude-3-haiku-20240307"
+    model="gpt-4o-mini"  # or "claude-3-haiku-20240307" or "grok-3-mini"
 )
-
-# Stream responses
-async for chunk in client.stream(
-    "Tell me a story",
-    "gpt-4o-mini"
-):
-    print(chunk, end="")
-
-# Stream with usage data
-response = await client.stream_with_usage(
-    "Explain Python in one sentence",
-    "gpt-4o-mini"
-)
-print(f"Response: {response.get_text()}")
-print(f"Tokens used: {response.usage['total_tokens']}")
+print(response.text)
 print(f"Cost: ${response.cost_usd:.6f}")
 ```
 
-### Conversation Support
+### Stream Responses Consistently
 
 ```python
-from steer_llm_sdk import SteerLLMClient, ConversationMessage, ConversationRole
-
-client = SteerLLMClient()
-
-# Multi-turn conversation
-messages = [
-    ConversationMessage(
-        role=ConversationRole.SYSTEM,
-        content="You are a helpful assistant"
-    ),
-    ConversationMessage(
-        role=ConversationRole.USER,
-        content="What's the capital of France?"
-    )
-]
-
-response = await client.generate(messages, "gpt-4o-mini")
-```
-
-### Model Discovery
-
-```python
-from steer_llm_sdk import get_available_models
-
-# Get all available models
-models = get_available_models()
-
-for model_id, config in models.items():
-    print(f"{model_id}: {config.description}")
-    print(f"  Provider: {config.provider}")
-    print(f"  Max tokens: {config.max_tokens}")
-    if config.input_cost_per_1k_tokens and config.output_cost_per_1k_tokens:
-        print(f"  Input cost: ${config.input_cost_per_1k_tokens}/1k tokens")
-        print(f"  Output cost: ${config.output_cost_per_1k_tokens}/1k tokens")
-```
-
-### Pricing Configuration
-
-Model pricing is configured in `steer_llm_sdk/config/models.py`. You can override pricing using:
-
-#### Environment Variable (JSON)
-```bash
-export STEER_PRICING_OVERRIDES_JSON='{
-  "gpt-4o-mini": {
-    "input_cost_per_1k_tokens": 0.00015,
-    "output_cost_per_1k_tokens": 0.0006
-  }
-}'
-```
-
-#### Configuration File
-```bash
-export STEER_PRICING_OVERRIDES_FILE=/path/to/pricing.json
-# Or place in ~/.steer/pricing_overrides.json
-```
-
-#### File Format
-```json
-{
-  "gpt-4o-mini": {
-    "input_cost_per_1k_tokens": 0.00015,
-    "output_cost_per_1k_tokens": 0.0006,
-    "cached_input_cost_per_1k_tokens": 0.000075
-  },
-  "gpt-5-mini": {
-    "input_cost_per_1k_tokens": 0.00025,
-    "output_cost_per_1k_tokens": 0.002
-  }
-}
-```
-
-## Supported Models
-
-### OpenAI
-- **GPT-4o Mini** (`gpt-4o-mini`) - Efficient, cost-effective model
-- **GPT-4.1 Nano** (`gpt-4.1-nano`) - Ultra-light model for simple tasks
-- **GPT-3.5 Turbo** (`gpt-3.5-turbo`) - Fast general-purpose model
-
-### Anthropic
-- **Claude 3 Haiku** (`claude-3-haiku-20240307`) - Fast and affordable
-- **Claude 3.5 Sonnet** (`claude-3-5-sonnet-20241022`) - Balanced performance
-- **Claude 3 Opus** (`claude-3-opus-20240229`) - Most capable model
-
-### xAI
-- **Grok Beta** (`grok-beta`) - Early access model
-- **Grok 2** (`grok-2-1212`) - Latest production model
-- **Grok 3 Mini** (`grok-3-mini`) - Lightweight variant
-
-## HTTP API Endpoints (Optional)
-
-The SDK can optionally expose REST API endpoints using FastAPI:
-
-```python
-# Install with HTTP support
-# pip install steer-llm-sdk[http]
-
-from fastapi import FastAPI
-from steer_llm_sdk.http.api import router as llm_router
-
-app = FastAPI()
-app.include_router(llm_router, prefix="/api/v1")
-
-# Available endpoints:
-# POST /api/v1/generate - Generate text
-# POST /api/v1/stream - Stream text
-# GET /api/v1/model-catalog - List models
-# GET /api/v1/status - Check status
-```
-
-The SDK works perfectly without HTTP endpoints for notebooks, CLIs, and batch jobs. See the [HTTP Endpoints Guide](docs/guides/http-endpoints.md) for details.
-
-## Advanced Features
-
-### Custom Parameters
-
-```python
-response = await client.generate(
-    "Generate creative ideas",
-    "gpt-4o-mini",
-    temperature=0.9,
-    max_tokens=500,
-    top_p=0.95
-)
-```
-
-### Cost Calculation
-
-The SDK automatically calculates costs based on token usage and model pricing:
-
-```python
-response = await client.generate("Hello world", "gpt-4o-mini")
-print(f"Cost: ${response.cost_usd:.4f}")
-print(f"Cost breakdown: {response.cost_breakdown}")
-print(f"Tokens used: {response.usage}")
-```
-
-### Model Availability Check
-
-```python
-from steer_llm_sdk import check_lightweight_availability
-
-if check_lightweight_availability("gpt-4o-mini"):
-    response = await generate("Hello", "gpt-4o-mini")
-else:
-    print("Model not available")
-```
-
-### Direct Router Usage
-
-```python
-from steer_llm_sdk import llm_router
-
-# For more control, use the router directly
-response = await llm_router.generate(
-    messages="Translate to French: Hello world",
-    llm_model_id="gpt-4o-mini",
-    raw_params={"temperature": 0.3}
-)
-```
-
-### Streaming with Usage Data (new split API)
-
-To capture usage and cost alongside streamed text, use the split API:
-
-```python
-from steer_llm_sdk import SteerLLMClient
-
-client = SteerLLMClient()
-
-# Pure streaming (yields chunks)
+# Streaming works the same way for all providers
 async for chunk in client.stream(
-    messages="Write a Python function to calculate factorial",
-    model="gpt-4o-mini",
-    temperature=0.7,
-    max_tokens=200,
+    "Tell me about the future of AI",
+    model="claude-3-5-sonnet-20241022"
 ):
-    print(chunk, end="")
+    print(chunk, end="", flush=True)
 
-# Streaming with usage summary (awaitable)
+# Or get usage data with your stream
 response = await client.stream_with_usage(
-    messages="Write a Python function to calculate factorial",
-    model="gpt-4o-mini",
-    temperature=0.7,
-    max_tokens=200,
+    "Generate a business plan outline",
+    model="gpt-4o-mini"
 )
-
-print("\nGenerated code:")
-print(response.get_text())
-
-print(f"\nToken usage:")
-print(f"  Prompt tokens: {response.usage['prompt_tokens']}")
-print(f"  Completion tokens: {response.usage['completion_tokens']}")
-print(f"  Total tokens: {response.usage['total_tokens']}")
-
-if response.cost_usd:
-    print(f"\nEstimated cost: ${response.cost_usd:.6f}")
-    if response.cost_breakdown:
-        print(f"  Input cost: ${response.cost_breakdown['input_cost']:.6f}")
-        print(f"  Output cost: ${response.cost_breakdown['output_cost']:.6f}")
+print(f"\nTotal tokens: {response.usage['total_tokens']}")
+print(f"Cost: ${response.cost_usd:.6f}")
 ```
 
-### Agent Runtime (OpenAI Agents SDK)
+### Build Reusable Tools
 
-The SDK now includes native support for the OpenAI Agents SDK, enabling advanced agent capabilities with tools and structured outputs. 
+```python
+from steer_llm_sdk.orchestration import Tool, Orchestrator
 
-**Installation**: Requires the `openai-agents` extra:
-```bash
-pip install "steer-llm-sdk[openai-agents]"
+# Define a tool once, use it in any project
+class AnalysisTool(Tool):
+    @property
+    def name(self):
+        return "analyze_data"
+    
+    async def execute(self, request, options=None, event_manager=None):
+        # Your tool logic here
+        result = await analyze_data(request["data"])
+        return {"analysis": result}
+
+# Register and use
+client.register_tool(AnalysisTool())
+orchestrator = Orchestrator()
+result = await orchestrator.run(
+    request={"data": your_data},
+    tool_name="analyze_data"
+)
 ```
 
-**Basic Agent Example**:
+### Create Agents with Tools
+
 ```python
 from steer_llm_sdk.agents.models.agent_definition import AgentDefinition, Tool
 from steer_llm_sdk.agents.runner import AgentRunner
 
-# Define a tool
-def calculate_factorial(n: int) -> int:
-    """Calculate the factorial of a number."""
-    if n <= 1:
-        return 1
-    return n * calculate_factorial(n - 1)
+# Define reusable agent patterns
+def calculate_metrics(data: list) -> dict:
+    """Calculate statistics from data."""
+    return {
+        "mean": sum(data) / len(data),
+        "max": max(data),
+        "min": min(data)
+    }
 
-# Create agent definition
 definition = AgentDefinition(
-    system="You are a helpful math assistant.",
-    user_template="Calculate the factorial of {number}",
+    system="You are a data analysis assistant.",
+    user_template="Analyze this data: {data}",
     model="gpt-4",
     tools=[
         Tool(
-            name="factorial",
-            description="Calculate the factorial of a number",
+            name="calculate_metrics",
+            description="Calculate statistics from numerical data",
             parameters={
                 "type": "object",
-                "properties": {"n": {"type": "integer"}},
-                "required": ["n"]
+                "properties": {
+                    "data": {"type": "array", "items": {"type": "number"}}
+                },
+                "required": ["data"]
             },
-            handler=calculate_factorial
+            handler=calculate_metrics
         )
     ]
 )
 
-# Run the agent
+# Run with any compatible model
 runner = AgentRunner()
 result = await runner.run(
     definition=definition,
-    variables={"number": 5},
-    options={"runtime": "openai_agents"}
+    variables={"data": [1, 2, 3, 4, 5]}
 )
-
-print(result.content)  # "The factorial of 5 is 120"
 ```
-
-**Structured Output with JSON Schema**:
-```python
-from steer_llm_sdk.agents.models.agent_definition import AgentDefinition
-
-# Define agent with structured output
-definition = AgentDefinition(
-    system="Extract product information from the description.",
-    user_template="Product: {description}",
-    model="gpt-4",
-    json_schema={
-        "type": "object",
-        "properties": {
-            "name": {"type": "string"},
-            "price": {"type": "number"},
-            "category": {"type": "string"}
-        },
-        "required": ["name", "price", "category"],
-        "additionalProperties": False
-    }
-)
-
-# Run with strict JSON validation
-result = await runner.run(
-    definition=definition,
-    variables={"description": "iPhone 15 Pro, smartphone, $999"},
-    options={"runtime": "openai_agents", "strict": True}
-)
-
-print(result.final_json)  # {"name": "iPhone 15 Pro", "price": 999, "category": "smartphone"}
-```
-
-**Streaming Agent Responses**:
-```python
-# Stream agent responses with tools
-async for event in runner.stream(
-    definition=definition,
-    variables={"query": "Calculate 10!"},
-    options={"runtime": "openai_agents"}
-):
-    if event.type == "delta":
-        print(event.delta, end="")
-    elif event.type == "tool_call":
-        print(f"\n[Calling tool: {event.metadata['tool']}]")
-```
-
-For more details, see the [Agent Runtime Integration Guide](docs/guides/agent-runtime-integration.md).
-
-### Orchestration (Tool-Based Execution)
-
-Execute complex operations through registered tools that handle parallel execution and analysis:
-
-```python
-from steer_llm_sdk import SteerLLMClient
-from steer_llm_sdk.orchestration import Orchestrator, OrchestrationConfig
-from my_app.tools import AnalysisBundleTool  # Your custom tool
-
-# Register tools at startup
-client = SteerLLMClient()
-client.register_tool(AnalysisBundleTool())
-
-# Execute via orchestrator
-orchestrator = Orchestrator()
-result = await orchestrator.run(
-    request={"query": "What are the implications of quantum computing?"},
-    tool_name="analysis_bundle",
-    tool_options={
-        "k": 3,  # Run 3 parallel replicates
-        "epsilon": 0.2  # Early stop threshold
-    },
-    options=OrchestrationConfig(
-        max_parallel=10,
-        streaming=True,
-        budget={"tokens": 2000}
-    )
-)
-
-# Access Evidence Bundle with statistics
-if "evidence_bundle" in result.content:
-    bundle = result.content["evidence_bundle"]
-    print(f"Confidence: {bundle['summary']['confidence']}")
-    print(f"Total tokens: {result.usage['total_tokens']}")
-```
-
-For more details, see the [Orchestration Guide](docs/orchestration/overview.md).
 
 ## Architecture
 
-The SDK follows a modular architecture with a unified streaming pipeline:
-
-### Core Components
+Clean, layered architecture that's easy to extend:
 
 ```
-steer_llm_sdk/
-├── api/                 # High-level client API
-│   └── client.py        # SteerLLMClient implementation
-├── core/                # Core functionality
-│   ├── routing/         # Request routing and model selection
-│   ├── capabilities/    # Model capabilities management
-│   └── pricing/         # Pricing calculations
-├── providers/           # Provider implementations
-│   ├── base.py          # Base provider interface
-│   ├── openai/          # OpenAI implementation
-│   ├── anthropic/       # Anthropic implementation
-│   └── xai/             # xAI implementation
-├── streaming/           # Unified streaming architecture
-│   ├── helpers.py       # StreamingHelper (orchestration)
-│   ├── processor.py     # EventProcessor (pipeline)
-│   ├── adapter.py       # StreamAdapter (normalization)
-│   └── manager.py       # EventManager (callbacks)
-├── models/              # Data models and types
-│   ├── generation.py    # Request/response models
-│   ├── events.py        # Streaming event types
-│   └── streaming.py     # Streaming configuration
-└── observability/       # Metrics and monitoring
-    └── collector.py     # Metrics collection
+┌─────────────────────────────────────────────────────────┐
+│                 Your Application                         │
+├─────────────────────────────────────────────────────────┤
+│              SteerLLMClient (Unified API)                │
+├─────────────────────────────────────────────────────────┤
+│     Streaming Layer (Normalizes all providers)          │
+├─────────────────────────────────────────────────────────┤
+│    Reliability Layer (Retries, Circuit Breakers)        │
+├─────────────────────────────────────────────────────────┤
+│        Provider Adapters (OpenAI, Anthropic, xAI)       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Streaming Architecture
+## Why This SDK?
 
-The SDK uses a consolidated streaming architecture that ensures consistent behavior across all providers:
+I use this in all my projects now. It's saved me countless hours of rewriting the same integration code. Here's what it solves:
 
-1. **StreamingHelper** - High-level orchestration of streaming operations
-2. **EventProcessor** - Composable pipeline for filtering and transforming events  
-3. **StreamAdapter** - Provider-specific normalization and event lifecycle
+- **No more provider lock-in**: Switch between models with one line
+- **Consistent streaming**: Finally, streaming that works the same everywhere
+- **Reusable patterns**: Build your tools once, use them anywhere
+- **Cost visibility**: Know what you're spending across all providers
+- **Production-ready**: All the boring stuff (retries, errors, monitoring) is handled
 
-For detailed information, see the [Streaming Architecture documentation](docs/architecture/streaming.md).
+## Real-World Usage
 
-## Development
-
-### Setup Development Environment
-
-```bash
-# Clone the repository
-git clone https://github.com/steer-ai/steer-llm-sdk.git
-cd steer-llm-sdk
-
-# Create virtual environment (Python 3.10+)
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install in development mode
-pip install -e ".[dev]"
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=steer_llm_sdk
-
-# Run specific test file
-pytest tests/unit/test_providers.py
-```
-
-### Code Quality
-
-```bash
-# Format code
-black steer_llm_sdk tests
-
-# Lint code
-ruff check steer_llm_sdk tests
-```
-
-## API Reference
-
-### Client Methods
-
-- `generate(messages, model, **params)`: Generate text response (returns object)
-- `stream(messages, model, **params)`: Stream text response (async generator yielding chunks)
-- `stream_with_usage(messages, model, **params)`: Awaitable streaming with usage summary
-- `get_available_models()`: Get all configured models
-- `check_model_availability(model_id)`: Check if model is available
-
-### Parameters
-
-- `messages`: String or list of ConversationMessage objects
-- `model`: Model ID string (e.g., "gpt-4o-mini")
-- `temperature`: Controls randomness (0.0-2.0)
-- `max_tokens`: Maximum tokens to generate
-- `top_p`: Nucleus sampling parameter
-- `frequency_penalty`: Reduce repetition
-- `presence_penalty`: Encourage new topics
-
-## Error Handling
-
+### Multi-Model Comparison
 ```python
-from steer_llm_sdk import SteerLLMClient
+models = ["gpt-4o-mini", "claude-3-haiku-20240307", "grok-3-mini"]
+prompt = "Explain quantum computing to a 5-year-old"
 
-client = SteerLLMClient()
-
-try:
-    response = await client.generate("Hello", "gpt-4o-mini")
-except Exception as e:
-    print(f"Error: {e}")
+for model in models:
+    response = await client.generate(prompt, model)
+    print(f"\n{model}: {response.text[:200]}...")
+    print(f"Cost: ${response.cost_usd:.6f}")
 ```
 
-## Performance Considerations
+### Reliable Document Processing
+```python
+# The SDK handles retries and failures automatically
+async def process_document(doc):
+    try:
+        # If one provider fails, it automatically retries
+        result = await client.generate(
+            f"Summarize this document: {doc}",
+            model="gpt-4o-mini",
+            max_tokens=500
+        )
+        return result.text
+    except Exception as e:
+        # Only fails if all retries exhausted
+        logger.error(f"Failed to process: {e}")
+```
 
-- Models are loaded on-demand to minimize memory usage
-- Streaming is recommended for long responses
-- Use `check_lightweight_availability()` for quick availability checks
-- Cost calculation adds minimal overhead
+### Cost-Aware Operations
+```python
+# Set a cost budget and track usage
+budget = 1.00  # $1 budget
+total_cost = 0
 
-## Security
+while total_cost < budget:
+    response = await client.generate(
+        "Generate a creative story idea",
+        model="gpt-4o-mini"
+    )
+    total_cost += response.cost_usd
+    print(f"Generated idea (${response.cost_usd:.6f})")
+    print(f"Budget remaining: ${budget - total_cost:.2f}")
+```
 
-- API keys are never logged or stored
-- All provider communications use HTTPS
-- No user data is retained by the SDK
-- Supports custom HTTP proxies if needed
+### Advanced Orchestration with Budgets
+```python
+# Use orchestration for complex operations with budgets and reliability
+from steer_llm_sdk.orchestration import Orchestrator, OrchestrationConfig
 
-## Contributing
+orchestrator = Orchestrator()
+result = await orchestrator.run(
+    request={"data": "quarterly sales data", "analysis_type": "trends"},
+    tool_name="analysis_bundle",
+    tool_options={
+        "k": 3,  # Run 3 parallel analyses
+        "model": "gpt-4o-mini"
+    },
+    options=OrchestrationConfig(
+        # Budget constraints
+        budget={
+            "tokens": 5000,      # Max 5k tokens total
+            "cost_usd": 0.50,    # Max $0.50 spend
+            "ms": 30000          # 30 second timeout
+        },
+        # Reliability settings
+        max_retries=2,
+        retry_on_failure=True,
+        enable_circuit_breaker=True,
+        # Execution settings
+        max_parallel=5,
+        deterministic=True
+    )
+)
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is proprietary software. All rights reserved by Steer AI.
-
-## Support
-
-For issues and questions:
-- Create an issue on GitHub
-- Contact the Steer team at support@steer.ai
+print(f"Analysis complete. Total cost: ${result.usage.get('cost_usd', 0):.6f}")
+```
 
 ## Documentation
 
-- **[Architecture Overview](docs/architecture/)**: Detailed system design and components
-- **[Orchestration Guide](docs/orchestration/)**: Tool-based orchestration with reliability features
-- **[Streaming Guide](docs/guides/streaming.md)**: Complete streaming implementation guide
-- **[Agent Development](docs/guides/agent-runtime-integration.md)**: Building agents with tools
-- **[HTTP API Reference](docs/guides/http-endpoints.md)**: REST API endpoints documentation
-- **[Configuration Guide](docs/configuration/)**: Provider and system configuration
-- **[Metrics & Monitoring](docs/architecture/metrics.md)**: Observability setup
+- [Streaming Guide](docs/guides/streaming.md) - Master streaming patterns
+- [Agent Development](docs/guides/agent-runtime-integration.md) - Build sophisticated agents
+- [Orchestration Guide](docs/orchestration/) - Complex multi-step workflows
+- [Architecture Overview](docs/architecture/) - How it all fits together
 
-## Changelog
+## License
 
-### v0.3.2 (2025-08)
-- **Orchestration Module**: Production-ready tool-based orchestration
-  - Tool Registry for pluggable domain-specific tools
-  - Evidence Bundle format with statistical analysis
-  - Automatic tool selection with rule-based planner
-  - Reliability features: retry logic, circuit breakers, idempotency
-  - Clean architecture with no legacy code or technical debt
-  - All 32 orchestration tests passing (100% coverage)
+GPL-3.0 - see [LICENSE](LICENSE). This ensures the SDK remains open and improvements benefit everyone.
 
-### v0.3.1 (2025-08)
-- **Security**: API keys now passed directly to client instead of environment variables
-- Backward compatible with environment variables
+---
 
-### v0.3.0 (2025-08)
-- Agent infrastructure with OpenAI Agents SDK integration
-- Unified streaming architecture consolidation
-- Enhanced observability with metrics and tracing
-- Circuit breakers and advanced retry mechanisms
-- Responses API support for GPT-5 models
-- Pre-release cleanup and optimization
+*Built because I needed it. Shared because you might need it too.*
 
-### v0.2.x (2025-07)
-- Layered architecture implementation (Phases 0-7)
-- FastAPI separation into optional HTTP module
-- Comprehensive pricing system overhaul
-- Streaming API split (stream vs stream_with_usage)
-- Performance optimizations and connection pooling
-
-### v0.1.0 (2024-06-28)
-- Initial release
-- Support for OpenAI, Anthropic, and xAI providers
-- Unified interface with streaming support
-- Cost calculation and model registry
-- Python 3.10+ requirement
-- Full async/await support
-- Comprehensive test coverage
+**Created by Max Rossi** | [GitHub](https://github.com/maxr0ssi)
