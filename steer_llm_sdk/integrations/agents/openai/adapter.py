@@ -8,7 +8,6 @@ import asyncio
 import json
 import os
 import time
-from functools import partial
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 from ....agents.models.agent_definition import AgentDefinition, Tool
@@ -27,8 +26,7 @@ from .tools import convert_tools_to_sdk_format, extract_tool_results, validate_t
 
 # Lazy import for optional dependency
 try:
-    from agents import Agent, Runner, function_tool
-    from agents.guardrails import GuardrailFunctionOutput
+    from agents import Agent, Runner, function_tool, GuardrailFunctionOutput, ModelSettings
     AGENTS_SDK_AVAILABLE = True
 except ImportError:
     AGENTS_SDK_AVAILABLE = False
@@ -36,6 +34,7 @@ except ImportError:
     Runner = None
     function_tool = None
     GuardrailFunctionOutput = None
+    ModelSettings = None
 
 
 class OpenAIAgentAdapter(AgentRuntimeAdapter):
@@ -129,28 +128,30 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
                 options.budget
             )
         
-        # Extract model settings for Agent
-        model_settings = {
-            "model": definition.model,
-        }
-        
-        # Map normalized parameters to Agent settings
+        # Build ModelSettings object for Agent
+        # Note: 'model' is NOT part of ModelSettings - it's passed separately to Agent()
+        model_settings_kwargs = {}
+
+        # Map normalized parameters to ModelSettings fields
         if "temperature" in normalized_params:
-            model_settings["temperature"] = normalized_params["temperature"]
+            model_settings_kwargs["temperature"] = normalized_params["temperature"]
         if "top_p" in normalized_params:
-            model_settings["top_p"] = normalized_params["top_p"]
-        
-        # Handle max tokens - normalization already maps to the correct field name
-        # The OpenAI Agents SDK specifically expects "max_output_tokens" regardless
-        # of what field name the normalization layer provides. This is different from
-        # the Chat Completions API which uses model-specific field names.
+            model_settings_kwargs["top_p"] = normalized_params["top_p"]
+
+        # Handle max tokens - SDK ModelSettings uses 'max_tokens' field
         for field in ["max_tokens", "max_completion_tokens", "max_output_tokens"]:
             if field in normalized_params:
-                # OpenAI Agents SDK expects max_output_tokens
-                model_settings["max_output_tokens"] = normalized_params[field]
+                model_settings_kwargs["max_tokens"] = normalized_params[field]
                 break
+
+        # Handle seed via extra_args (seed is not a standard ModelSettings field)
         if options.seed and capabilities.supports_seed:
-            model_settings["seed"] = options.seed
+            if "extra_args" not in model_settings_kwargs:
+                model_settings_kwargs["extra_args"] = {}
+            model_settings_kwargs["extra_args"]["seed"] = options.seed
+
+        # Create ModelSettings object (or None if no settings)
+        model_settings = ModelSettings(**model_settings_kwargs) if model_settings_kwargs else None
         
         # Create guardrails for structured output if schema provided
         guardrails = []
@@ -186,12 +187,16 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
             guardrails.append(schema_guardrail)
         
         # Create the OpenAI Agent
+        # Note: OpenAI SDK has bugs expecting lists not None:
+        # - agent.py line 284: iterates over self.tools without None check
+        # - run.py line 439: concatenates output_guardrails without None check
         agent = Agent(
             name="Assistant",
+            model=definition.model,
             instructions=definition.system,
-            tools=sdk_tools,
+            tools=sdk_tools,  # Always pass list (empty or populated)
             model_settings=model_settings,
-            guardrails=guardrails if guardrails else None
+            output_guardrails=guardrails if guardrails else []  # Empty list not None
         )
         
         # Store prepared state
@@ -219,24 +224,20 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
         return prepared
     
     async def run(
-        self, 
-        prepared: PreparedRun, 
+        self,
+        prepared: PreparedRun,
         variables: Dict[str, Any]
     ) -> AgentRunResult:
-        """Execute a non-streaming agent run using Runner.run_sync."""
+        """Execute a non-streaming agent run using Runner.run."""
         start_time = time.time()
-        
+
         # Format user input with variables
         user_input = prepared.config["user_template"].format(**variables)
-        
-        # Run the agent synchronously
+
+        # Run the agent asynchronously
         try:
-            # Convert to sync execution in thread pool
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                partial(Runner.run_sync, prepared.agent, user_input)
-            )
+            # Use native async Runner.run() method
+            result = await Runner.run(prepared.agent, user_input)
             
             # Extract content and usage
             content = result.final_output
