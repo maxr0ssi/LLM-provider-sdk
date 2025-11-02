@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any, Dict, Optional, Union
+from typing import Any, AsyncGenerator, Dict, Optional, Union
 
 from ...core.capabilities import get_capabilities_for_model
 from ...core.routing import LLMRouter, get_config
@@ -246,7 +246,127 @@ class AgentRunner:
         if opts.idempotency_key:
             self.idempotency.store_result(opts.idempotency_key, result)
         return result
-    
+
+    async def stream(
+        self,
+        definition: AgentDefinition,
+        variables: Dict[str, Any] = None,
+        opts: AgentOptions = None
+    ) -> AsyncGenerator[str, None]:
+        """Stream agent response chunks as they arrive.
+
+        This yields text chunks token-by-token, similar to SteerLLMClient.stream().
+        Uses the existing streaming infrastructure via runtime adapters.
+
+        Args:
+            definition: Agent definition with system prompt, tools, etc.
+            variables: Template variables for user message
+            opts: Agent options (must specify runtime)
+
+        Yields:
+            Text chunks from the agent's response
+
+        Raises:
+            ProviderError: If streaming fails
+        """
+        # Ensure options and runtime
+        if opts is None:
+            raise ValueError("opts.runtime must be specified for streaming")
+        if not opts.runtime:
+            raise ValueError("opts.runtime must be specified for streaming")
+
+        # Force streaming mode
+        opts.streaming = True
+
+        # Get runtime adapter
+        runtime = get_agent_runtime(opts.runtime)
+
+        # Convert to runtime options
+        run_options = AgentRunOptions(
+            runtime=opts.runtime,
+            streaming=True,
+            deterministic=opts.deterministic,
+            seed=opts.metadata.get("seed") if opts.metadata else None,
+            strict=opts.metadata.get("strict") if opts.metadata else None,
+            responses_use_instructions=opts.metadata.get("responses_use_instructions", False) if opts.metadata else False,
+            budget=dict(opts.budget) if opts.budget else None,
+            idempotency_key=opts.idempotency_key,
+            trace_id=opts.trace_id,
+            request_id=opts.metadata.get("request_id") if opts.metadata else None,
+            streaming_options=opts.metadata.get("streaming_options") if opts.metadata else None,
+            metadata=opts.metadata or {}
+        )
+
+        # Prepare agent
+        prepared = await runtime.prepare(definition, run_options)
+
+        # Create queue for chunk communication
+        chunk_queue = asyncio.Queue()
+        stream_done = asyncio.Event()
+        stream_error = None
+
+        # Callback to capture chunks
+        async def on_delta(event):
+            """Capture delta events and put text in queue."""
+            nonlocal stream_error
+            try:
+                text = event.get_text() if hasattr(event, 'get_text') else str(event)
+                if text:
+                    await chunk_queue.put(text)
+            except Exception as e:
+                stream_error = e
+
+        async def on_error(error):
+            """Capture errors."""
+            nonlocal stream_error
+            stream_error = error
+            stream_done.set()
+
+        async def on_complete(event):
+            """Signal completion."""
+            stream_done.set()
+
+        # Create event manager with callbacks
+        events = EventManager(
+            on_delta=on_delta,
+            on_error=on_error,
+            on_complete=on_complete
+        )
+
+        # Run streaming in background task
+        async def run_stream_task():
+            nonlocal stream_error
+            try:
+                async for _ in runtime.run_stream(prepared, variables or {}, events):
+                    pass
+            except Exception as e:
+                stream_error = e
+            finally:
+                stream_done.set()
+
+        task = asyncio.create_task(run_stream_task())
+
+        # Yield chunks as they arrive
+        try:
+            while not stream_done.is_set() or not chunk_queue.empty():
+                try:
+                    # Use short timeout to check stream_done frequently
+                    chunk = await asyncio.wait_for(chunk_queue.get(), timeout=0.1)
+                    yield chunk
+                except asyncio.TimeoutError:
+                    # Check if stream is done
+                    if stream_done.is_set() and chunk_queue.empty():
+                        break
+                    continue
+
+            # Check for errors
+            if stream_error:
+                raise ProviderError(str(stream_error), provider=opts.runtime)
+
+        finally:
+            # Ensure task is complete
+            await task
+
     async def _run_with_runtime(
         self,
         definition: AgentDefinition,

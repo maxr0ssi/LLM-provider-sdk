@@ -38,42 +38,23 @@ def create_tool_wrapper(tool: Tool) -> Callable:
     
     handler = tool.handler
     is_async = asyncio.iscoroutinefunction(handler)
-    
+
     # Extract parameter information from schema
     param_info = {}
     required_params = set()
-    
+
     if "properties" in tool.parameters:
         param_info = tool.parameters["properties"]
     if "required" in tool.parameters:
         required_params = set(tool.parameters["required"])
-    
+
     # Create wrapper based on sync/async nature
-    if is_async:
-        @wraps(handler)
-        async def wrapper(**kwargs):
-            # Filter out any extra parameters not in schema
-            filtered_kwargs = {
-                k: v for k, v in kwargs.items() 
-                if k in param_info
-            }
-            return await handler(**filtered_kwargs)
-    else:
-        @wraps(handler)
-        def wrapper(**kwargs):
-            # Filter out any extra parameters not in schema
-            filtered_kwargs = {
-                k: v for k, v in kwargs.items() 
-                if k in param_info
-            }
-            return handler(**filtered_kwargs)
-    
-    # Set function metadata
-    wrapper.__name__ = tool.name
-    wrapper.__doc__ = tool.description
-    
-    # Add parameter annotations based on schema
-    annotations = {}
+    # Use inspect to create proper function signature dynamically
+    import inspect
+    from typing import Optional
+
+    # Build parameter list for signature
+    sig_params = []
     for param_name, param_schema in param_info.items():
         # Map JSON schema types to Python types
         param_type = Any
@@ -87,15 +68,49 @@ def create_tool_wrapper(tool: Tool) -> Callable:
                 "object": dict
             }
             param_type = type_mapping.get(param_schema["type"], Any)
-        
-        annotations[param_name] = param_type
+
+        # Create parameter with or without default
+        has_default = "default" in param_schema or param_name not in required_params
+        if has_default:
+            default_value = param_schema.get("default", None)
+            sig_params.append(inspect.Parameter(
+                param_name,
+                inspect.Parameter.KEYWORD_ONLY,
+                default=default_value,
+                annotation=param_type if param_type != Any else Optional[Any]
+            ))
+        else:
+            sig_params.append(inspect.Parameter(
+                param_name,
+                inspect.Parameter.KEYWORD_ONLY,
+                annotation=param_type
+            ))
+
+    # Create wrapper based on sync/async nature
+    if is_async:
+        async def wrapper(**kwargs):
+            # Filter out any extra parameters not in schema
+            filtered_kwargs = {
+                k: v for k, v in kwargs.items()
+                if k in param_info
+            }
+            return await handler(**filtered_kwargs)
+    else:
+        def wrapper(**kwargs):
+            # Filter out any extra parameters not in schema
+            filtered_kwargs = {
+                k: v for k, v in kwargs.items()
+                if k in param_info
+            }
+            return handler(**filtered_kwargs)
+
+    # Apply signature to wrapper
+    wrapper.__signature__ = inspect.Signature(parameters=sig_params, return_annotation=Any)
     
-    # Set return type annotation
-    annotations["return"] = Any
-    
-    # Apply annotations to wrapper
-    wrapper.__annotations__ = annotations
-    
+    # Set function metadata
+    wrapper.__name__ = tool.name
+    wrapper.__doc__ = tool.description
+
     return wrapper
 
 
@@ -116,13 +131,18 @@ def convert_tools_to_sdk_format(tools: List[Tool]) -> List[Callable]:
     for tool in tools:
         # Create wrapper function
         wrapper = create_tool_wrapper(tool)
-        
+
         # Apply function_tool decorator
         decorated = function_tool(wrapper)
-        
+
+        # Restore function name and docstring after decoration
+        # (function_tool may override these)
+        decorated.__name__ = tool.name
+        decorated.__doc__ = tool.description
+
         # Store metadata for debugging
         decorated._original_tool = tool
-        
+
         sdk_tools.append(decorated)
     
     return sdk_tools
