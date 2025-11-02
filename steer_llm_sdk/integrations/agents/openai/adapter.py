@@ -187,13 +187,16 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
             guardrails.append(schema_guardrail)
         
         # Create the OpenAI Agent
+        # Note: OpenAI SDK has bugs expecting lists not None:
+        # - agent.py line 284: iterates over self.tools without None check
+        # - run.py line 439: concatenates output_guardrails without None check
         agent = Agent(
             name="Assistant",
             model=definition.model,
             instructions=definition.system,
-            tools=sdk_tools,
+            tools=sdk_tools,  # Always pass list (empty or populated)
             model_settings=model_settings,
-            output_guardrails=guardrails if guardrails else None
+            output_guardrails=guardrails if guardrails else []  # Empty list not None
         )
         
         # Store prepared state
