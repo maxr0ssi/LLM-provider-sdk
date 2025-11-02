@@ -194,10 +194,6 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
         # Note: OpenAI SDK has bugs expecting lists not None:
         # - agent.py line 284: iterates over self.tools without None check
         # - run.py line 439: concatenates output_guardrails without None check
-        print(f"[ADAPTER] Creating Agent with {len(sdk_tools)} tools")
-        for i, tool in enumerate(sdk_tools, 1):
-            print(f"[ADAPTER]   {i}. {getattr(tool, '__name__', 'unknown')}")
-
         agent = Agent(
             name="Assistant",
             model=definition.model,
@@ -245,17 +241,10 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
         # Format user input with variables
         user_input = prepared.config["user_template"].format(**variables)
 
-        # Extract budget constraints
-        budget = prepared.config.get("budget", {})
-        max_turns = budget.get("turns") if budget else None
-
         # Run the agent asynchronously
         try:
-            # Use native async Runner.run() method with max_turns if specified
-            if max_turns:
-                result = await Runner.run(prepared.agent, user_input, max_turns=max_turns)
-            else:
-                result = await Runner.run(prepared.agent, user_input)
+            # Use native async Runner.run() method
+            result = await Runner.run(prepared.agent, user_input)
             
             # Extract content and usage
             content = result.final_output
