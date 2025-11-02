@@ -14,7 +14,7 @@ Features:
 - Conversation support
 """
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 from .api.client import SteerLLMClient, generate
 from .core.routing import (

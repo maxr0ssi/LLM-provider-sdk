@@ -364,16 +364,29 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
             # - raw_response_event: Contains raw OpenAI API events
             # - run_item_stream_event: Semantic events (tool calls, messages, etc.)
             # - agent_updated_stream_event: Agent handoff notifications
-            stream_call = Runner.run_streamed(prepared.agent, user_input, max_turns=max_turns) if max_turns else Runner.run_streamed(prepared.agent, user_input)
-            async for event in stream_call:
+            result = Runner.run_streamed(prepared.agent, user_input, max_turns=max_turns) if max_turns else Runner.run_streamed(prepared.agent, user_input)
+            async for event in result.stream_events():
                 # Map OpenAI SDK events to our events through bridge
-                if hasattr(event, 'type'):
-                    if event.type == "raw_response_event":
+                # Check event type by class name since structure varies
+                event_type = type(event).__name__
+
+                if event_type == "RawResponsesStreamEvent" or hasattr(event, 'type') and event.type == "raw_response_event":
                         # Extract content from raw OpenAI response events
                         if hasattr(event, 'data'):
                             data = event.data
-                            # Handle different raw event types
-                            if hasattr(data, 'choices') and data.choices:
+                            data_type = type(data).__name__
+
+                            # Handle Responses API format (what OpenAI Agents SDK uses)
+                            if data_type == "ResponseTextDeltaEvent":
+                                # Extract text delta
+                                if hasattr(data, 'delta') and data.delta:
+                                    if ttft is None:
+                                        ttft = int((time.time() - start_time) * 1000)
+                                    await bridge.on_delta(data.delta)
+                                    yield None  # Yield to make this an async iterator
+
+                            # Handle chat completion format (fallback)
+                            elif hasattr(data, 'choices') and data.choices:
                                 for choice in data.choices:
                                     if hasattr(choice, 'delta'):
                                         delta = choice.delta
@@ -381,7 +394,6 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
                                             if ttft is None:
                                                 ttft = int((time.time() - start_time) * 1000)
                                             await bridge.on_delta(delta.content)
-                                            # Yield to make this an async iterator
                                             yield None
                             
                             # Extract usage if present
@@ -389,45 +401,55 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
                                 usage = normalize_usage(data.usage, "openai")
                                 await bridge.on_usage(usage, is_estimated=False)
                     
-                    elif event.type == "run_item_stream_event":
-                        # Handle semantic events
-                        if hasattr(event, 'name'):
-                            if event.name == "tool_called":
-                                # Extract tool info from the event
-                                tool_name = "unknown"
-                                if hasattr(event, 'item') and hasattr(event.item, 'tool_name'):
-                                    tool_name = event.item.tool_name
-                                tools_used.append(tool_name)
-                                
-                                # Send as metadata-only delta
-                                await bridge.on_delta({
-                                    "type": "tool_call",
-                                    "tool": tool_name,
-                                    "event_name": event.name
-                                })
-                            
-                            elif event.name in ["message_output_created", "reasoning_item_created"]:
-                                # These might contain content to display
-                                await bridge.on_delta({
-                                    "type": "semantic_event",
-                                    "event_name": event.name,
-                                    "item": str(getattr(event, 'item', ''))
-                                })
-                    
-                    elif event.type == "agent_updated_stream_event":
-                        # Track agent changes
-                        await bridge.on_delta({
-                            "type": "agent_update",
-                            "new_agent": getattr(event, 'new_agent', {})
-                        })
-                
-                # Handle unexpected event formats
-                else:
-                    # Generic event handling as metadata
+                elif event_type == "RunItemStreamEvent" or (hasattr(event, 'type') and event.type == "run_item_stream_event"):
+                    # Handle semantic events
+                    if hasattr(event, 'name'):
+                        if event.name == "tool_called":
+                            # Extract tool info from the event
+                            tool_name = "unknown"
+                            if hasattr(event, 'item') and hasattr(event.item, 'tool_name'):
+                                tool_name = event.item.tool_name
+                            tools_used.append(tool_name)
+
+                            # Send as metadata-only delta
+                            await bridge.on_delta({
+                                "type": "tool_call",
+                                "tool": tool_name,
+                                "event_name": event.name
+                            })
+
+                        elif event.name in ["message_output_created", "reasoning_item_created"]:
+                            # These might contain content to display
+                            await bridge.on_delta({
+                                "type": "semantic_event",
+                                "event_name": event.name,
+                                "item": str(getattr(event, 'item', ''))
+                            })
+
+                elif event_type == "AgentUpdatedStreamEvent" or (hasattr(event, 'type') and event.type == "agent_updated_stream_event"):
+                    # Track agent changes
                     await bridge.on_delta({
-                        "type": "unknown",
-                        "raw_event": str(event)
+                        "type": "agent_update",
+                        "new_agent": getattr(event, 'new_agent', {})
                     })
+
+                else:
+                    # Generic event handling - try to extract text if available
+                    # Some events might be StreamDelta or other types
+                    if hasattr(event, 'delta') and hasattr(event.delta, 'content'):
+                        content = event.delta.content
+                        if content:
+                            if ttft is None:
+                                ttft = int((time.time() - start_time) * 1000)
+                            await bridge.on_delta(content)
+                            yield None
+                    elif hasattr(event, 'content'):
+                        content = event.content
+                        if content:
+                            if ttft is None:
+                                ttft = int((time.time() - start_time) * 1000)
+                            await bridge.on_delta(content)
+                            yield None
             
             # Get final usage from bridge if not already emitted
             if not bridge._usage_emitted:
