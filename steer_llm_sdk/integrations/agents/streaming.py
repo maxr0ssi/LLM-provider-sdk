@@ -123,7 +123,7 @@ class AgentStreamingBridge:
             # Extract text from structured delta
             normalized = self.adapter.normalize_delta(delta)
             text = normalized.get_text()
-            is_json = normalized.type == DeltaType.JSON
+            is_json = hasattr(normalized, 'type') and normalized.type == DeltaType.JSON
         
         # Track chunk
         if text:
