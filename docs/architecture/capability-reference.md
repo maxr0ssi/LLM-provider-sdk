@@ -23,32 +23,32 @@ This document provides a reference for all model capabilities in the SDK.
 
 | Model | Temperature | Max Tokens Field (Chat) | Responses API Field | JSON Schema | Caching | Special Notes |
 |-------|-------------|-------------------------|---------------------|-------------|---------|---------------|
-| gpt-4o-mini | ✅ Normal | max_tokens | max_output_tokens | ✅ | ✅ | Standard model |
-| gpt-4.1-nano | ✅ Normal | max_tokens | max_output_tokens | ✅ | ❌ | Budget model |
-| gpt-3.5-turbo | ✅ Normal | max_tokens | - | ❌ | ❌ | Legacy model |
-| o4-mini | ✅ Force 1.0 | max_completion_tokens | max_output_tokens | ✅ | ✅ | Requires temp=1.0 |
-| gpt-4.1-mini | ✅ Normal | max_tokens | max_output_tokens | ✅ | ✅ | Standard model |
-| gpt-5-mini | ❌ (omit in Responses API) | max_tokens | max_output_tokens | ✅ | ✅ | No temp in Responses API |
-| gpt-4o | ✅ Normal | max_tokens | max_output_tokens | ✅ | ✅ | Flagship model |
-| gpt-4.1 | ✅ Normal | max_tokens | max_output_tokens | ✅ | ✅ | Flagship model |
-| gpt-5 | ✅ Normal | max_tokens | max_output_tokens | ✅ | ✅ | Next-gen flagship |
-| gpt-5-nano | ✅ Normal | max_tokens | max_output_tokens | ✅ | ✅ | Next-gen budget |
+| gpt-4o-mini | Normal | max_tokens | max_output_tokens | Yes | Yes | Standard model |
+| gpt-4.1-nano | Normal | max_tokens | max_output_tokens | Yes | No | Budget model |
+| gpt-3.5-turbo | Normal | max_tokens | - | No | No | Legacy model |
+| o4-mini | Force 1.0 | max_completion_tokens | max_output_tokens | Yes | Yes | Requires temp=1.0 |
+| gpt-4.1-mini | Normal | max_tokens | max_output_tokens | Yes | Yes | Standard model |
+| gpt-5-mini | No (omit in Responses API) | max_tokens | max_output_tokens | Yes | Yes | No temp in Responses API |
+| gpt-4o | Normal | max_tokens | max_output_tokens | Yes | Yes | Flagship model |
+| gpt-4.1 | Normal | max_tokens | max_output_tokens | Yes | Yes | Flagship model |
+| gpt-5 | Normal | max_tokens | max_output_tokens | Yes | Yes | Next-gen flagship |
+| gpt-5-nano | Normal | max_tokens | max_output_tokens | Yes | Yes | Next-gen budget |
 
 ### Anthropic Models
 
 | Model | Temperature | Max Tokens Field (Chat) | Responses API Field | JSON Schema | Caching | Special Notes |
 |-------|-------------|-------------------------|---------------------|-------------|---------|---------------|
-| claude-3-haiku-20240307 | ✅ Normal | max_tokens | - | ❌ | ✅ | Fast, affordable |
-| claude-3-5-sonnet-20241022 | ✅ Normal | max_tokens | - | ❌ | ✅ | Balanced model |
-| claude-3-opus-20240229 | ✅ Normal | max_tokens | - | ❌ | ✅ | Most capable |
+| claude-3-haiku-20240307 | Normal | max_tokens | - | No | Yes | Fast, affordable |
+| claude-3-5-sonnet-20241022 | Normal | max_tokens | - | No | Yes | Balanced model |
+| claude-3-opus-20240229 | Normal | max_tokens | - | No | Yes | Most capable |
 
 ### xAI Models
 
 | Model | Temperature | Max Tokens Field (Chat) | Responses API Field | JSON Schema | Caching | Special Notes |
 |-------|-------------|-------------------------|---------------------|-------------|---------|---------------|
-| grok-beta | ✅ Normal | max_tokens | - | ❌ | ❌ | Early access |
-| grok-2-1212 | ✅ Normal | max_tokens | - | ❌ | ❌ | Production model |
-| grok-3-mini | ✅ Normal | max_tokens | - | ❌ | ❌ | Lightweight variant |
+| grok-beta | Normal | max_tokens | - | No | No | Early access |
+| grok-2-1212 | Normal | max_tokens | - | No | No | Production model |
+| grok-3-mini | Normal | max_tokens | - | No | No | Lightweight variant |
 
 ## Usage Examples
 

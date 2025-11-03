@@ -1,24 +1,20 @@
 # Metrics Architecture
 
-## Overview
+Overview of the metrics collection system for LLM observability.
 
-The Steer LLM SDK includes a comprehensive metrics collection system designed to provide observability into LLM operations. The system is lightweight, extensible, and integrates seamlessly with popular monitoring tools.
+## Components
 
-## Architecture Components
+### 1. Metrics Models
 
-### 1. Metrics Models (`observability/models.py`)
-
-The SDK defines several metric types to capture different aspects of LLM operations:
-
-- **RequestMetrics**: Core request-level metrics (latency, tokens, errors)
-- **StreamingMetrics**: Streaming-specific metrics (chunks, throughput, TTFT)
-- **ReliabilityMetrics**: Retry and circuit breaker metrics
-- **UsageMetrics**: Aggregated usage over time windows
-- **ErrorMetrics**: Detailed error tracking
+Core metric types:
+- **RequestMetrics** - Latency, tokens, cost, errors
+- **StreamingMetrics** - Chunks, throughput, time to first token
+- **ReliabilityMetrics** - Retries, circuit breaker trips
+- **UsageMetrics** - Aggregated usage over time
 
 ```python
 @dataclass
-class RequestMetrics(BaseMetrics):
+class RequestMetrics:
     duration_ms: float
     time_to_first_token_ms: float
     prompt_tokens: int
@@ -29,16 +25,11 @@ class RequestMetrics(BaseMetrics):
     response_format: str  # text, json_object
 ```
 
-### 2. Metrics Collector (`observability/collector.py`)
+### 2. Metrics Collector
 
-The central component that:
-- Manages metric collection lifecycle
-- Supports batching for performance
-- Implements sampling and filtering
-- Dispatches metrics to multiple sinks
+Central component that manages metric collection lifecycle:
 
 ```python
-# Basic usage
 from steer_llm_sdk.observability import MetricsCollector, MetricsConfig
 
 collector = MetricsCollector(
@@ -49,28 +40,22 @@ collector = MetricsCollector(
     )
 )
 
-# Track a request
+# Track request
 async with collector.track_request(
     provider="openai",
     model="gpt-4",
     method="generate"
 ) as metrics:
-    # Your LLM operation
     response = await llm.generate(...)
-    
-    # Update metrics
     metrics.prompt_tokens = response.usage.prompt_tokens
     metrics.completion_tokens = response.usage.completion_tokens
 ```
 
 ### 3. Metrics Sinks
 
-Sinks are pluggable destinations for metrics:
+Pluggable destinations for metrics:
 
-#### In-Memory Sink (`sinks/in_memory.py`)
-- Stores metrics in memory with circular buffer
-- Provides query and aggregation capabilities
-- Useful for testing and debugging
+#### In-Memory Sink
 
 ```python
 from steer_llm_sdk.observability.sinks import InMemoryMetricsSink
@@ -80,20 +65,16 @@ collector.add_sink(sink)
 
 # Query metrics
 metrics = await sink.get_metrics(
-    start_time=time.time() - 300,  # Last 5 minutes
+    start_time=time.time() - 300,
     provider="openai"
 )
 
-# Get summary statistics
+# Summary statistics
 summary = await sink.get_summary(window_seconds=300)
 print(f"Avg latency: {summary.avg_latency_ms}ms")
-print(f"P95 latency: {summary.p95_latency_ms}ms")
 ```
 
-#### OTLP Sink (`sinks/otlp.py`)
-- Exports metrics via OpenTelemetry Protocol
-- Compatible with Prometheus, Jaeger, etc.
-- Supports custom attributes and namespaces
+#### OTLP Sink
 
 ```python
 from steer_llm_sdk.observability.sinks import OTelMetricsSink
@@ -106,30 +87,24 @@ collector.add_sink(sink)
 ```
 
 #### Custom Sinks
-Implement the `MetricsSink` protocol:
 
 ```python
 from steer_llm_sdk.observability.sinks import MetricsSink
 
 class CustomMetricsSink(MetricsSink):
     async def record(self, metrics: AgentMetrics) -> None:
-        # Send to your backend
         await my_backend.send(metrics)
-    
+
     async def flush(self) -> None:
-        # Flush any buffered data
         await my_backend.flush()
 ```
 
-## Integration Points
+## Integration
 
-### 1. Client Integration
-
-The `SteerLLMClient` automatically tracks metrics:
+### Client Integration
 
 ```python
 from steer_llm_sdk import SteerLLMClient
-from steer_llm_sdk.observability import MetricsConfig
 from steer_llm_sdk.observability.sinks import InMemoryMetricsSink
 
 client = SteerLLMClient(
@@ -137,194 +112,104 @@ client = SteerLLMClient(
     metrics_sinks=[InMemoryMetricsSink()]
 )
 
-# Metrics are automatically collected
+# Metrics automatically collected
 response = await client.generate("Hello!", model="gpt-4")
 ```
 
-### 2. Streaming Integration
-
-Streaming operations track additional metrics:
+### Streaming Integration
 
 ```python
 response = await client.stream_with_usage(
-    messages="Write a story",
+    "Write a story",
     model="gpt-4"
 )
 
-# Metrics include:
-# - Time to first token (TTFT)
-# - Chunks per second
-# - Total streaming duration
-# - JSON parsing statistics (if applicable)
+# Streaming metrics include:
+# - time_to_first_token_ms
+# - chunks_per_second
+# - throughput_chars_per_second
 ```
 
-### 3. Reliability Integration
-
-The reliability layer reports retry and circuit breaker metrics:
+### Orchestration Integration
 
 ```python
-# Automatically tracked:
-# - Retry attempts and success rate
-# - Circuit breaker state changes
-# - Error categories and retry delays
+from steer_llm_sdk.orchestration import ReliableOrchestrator
+
+orchestrator = ReliableOrchestrator()
+result = await orchestrator.run(request, tool_name="analysis")
+
+# Orchestration metrics include:
+# - tool_execution_time_ms
+# - retry_count
+# - circuit_breaker_state
 ```
 
-## Performance Considerations
+## Configuration
 
-### 1. Overhead
-
-The metrics system is designed for minimal overhead:
-- Async collection (non-blocking)
-- Batching reduces I/O operations
-- Sampling controls data volume
-- Typical overhead: < 1% of request time
-
-### 2. Memory Usage
-
-- In-memory sink uses circular buffer (configurable size)
-- Metrics are lightweight data classes
-- Old metrics are automatically pruned
-
-### 3. Configuration
+### Basic Configuration
 
 ```python
 config = MetricsConfig(
-    enabled=True,  # Global enable/disable
-    batch_size=100,  # Batch metrics before sending
-    batch_timeout_seconds=1.0,  # Max time before flush
-    
-    # Feature flags
-    enable_streaming_metrics=True,
-    enable_reliability_metrics=True,
-    enable_cost_tracking=False,
-    
-    # Sampling (0.0 to 1.0)
-    request_sampling_rate=1.0,
-    streaming_sampling_rate=0.5,
-    error_sampling_rate=1.0,
-    
-    # Filters
-    filters=[OnlyProductionFilter()]
+    enabled=True,
+    batch_size=100,
+    request_sampling_rate=1.0,  # Sample 100% of requests
+    error_sampling_rate=1.0,    # Sample 100% of errors
+    batch_timeout_ms=5000
+)
+```
+
+### Sampling
+
+```python
+# Sample 10% of successful requests, all errors
+config = MetricsConfig(
+    enabled=True,
+    request_sampling_rate=0.1,
+    error_sampling_rate=1.0
+)
+```
+
+### Multiple Sinks
+
+```python
+from steer_llm_sdk.observability.sinks import InMemoryMetricsSink, OTelMetricsSink
+
+client = SteerLLMClient(
+    metrics_sinks=[
+        InMemoryMetricsSink(),  # For debugging
+        OTelMetricsSink()       # For production monitoring
+    ]
 )
 ```
 
 ## Metrics Reference
 
 ### Request Metrics
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| duration_ms | float | Total request duration |
-| time_to_first_token_ms | float | Time to first streaming token |
-| prompt_tokens | int | Input token count |
-| completion_tokens | int | Output token count |
-| cached_tokens | int | Cached prompt tokens |
-| provider | string | LLM provider name |
-| model | string | Model identifier |
-| method | string | generate or stream |
-| error_class | string | Error type if failed |
+- `duration_ms` - Total request duration
+- `time_to_first_token_ms` - Latency to first response
+- `prompt_tokens` - Input tokens
+- `completion_tokens` - Output tokens
+- `cached_tokens` - Cached prompt tokens
+- `cost_usd` - Estimated cost
 
 ### Streaming Metrics
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| total_chunks | int | Number of chunks received |
-| total_chars | int | Total characters streamed |
-| chunks_per_second | float | Streaming throughput |
-| first_chunk_latency_ms | float | Time to first chunk |
-| json_objects_found | int | JSON objects parsed |
-| aggregation_method | string | Token counting method |
-| aggregation_confidence | float | Accuracy confidence (0-1) |
+- `chunks_received` - Number of chunks
+- `chunks_per_second` - Throughput
+- `throughput_chars_per_second` - Character throughput
+- `stream_duration_ms` - Total streaming time
 
 ### Reliability Metrics
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| retry_attempts | int | Number of retry attempts |
-| retry_succeeded | bool | Whether retry succeeded |
-| total_retry_delay_ms | float | Total time spent retrying |
-| circuit_breaker_state | string | CLOSED, OPEN, HALF_OPEN |
-| error_category | string | Error classification |
-
-## Example: Production Setup
-
-```python
-import os
-from steer_llm_sdk import SteerLLMClient
-from steer_llm_sdk.observability import MetricsConfig, MetricsCollector
-from steer_llm_sdk.observability.sinks import OTelMetricsSink, InMemoryMetricsSink
-
-# Configure metrics
-config = MetricsConfig(
-    enabled=True,
-    batch_size=100,
-    request_sampling_rate=float(os.getenv("METRICS_SAMPLING_RATE", "1.0")),
-    enable_cost_tracking=os.getenv("ENABLE_COST_TRACKING") == "true"
-)
-
-# Create collector with multiple sinks
-collector = MetricsCollector(config)
-
-# OTLP for production monitoring
-if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
-    collector.add_sink(OTelMetricsSink(
-        service_name=os.getenv("SERVICE_NAME", "llm-service"),
-        namespace="production"
-    ))
-
-# In-memory for debugging
-if os.getenv("DEBUG_METRICS") == "true":
-    debug_sink = InMemoryMetricsSink()
-    collector.add_sink(debug_sink)
-    
-    # Expose debug endpoint
-    @app.get("/metrics/debug")
-    async def debug_metrics():
-        return await debug_sink.get_summary()
-
-# Create client with metrics
-client = SteerLLMClient(metrics_collector=collector)
-
-# Use client normally - metrics are automatic
-response = await client.generate(
-    messages="Explain quantum computing",
-    model="gpt-4"
-)
-```
+- `retry_count` - Number of retry attempts
+- `circuit_breaker_trips` - Circuit breaker openings
+- `fallback_count` - Fallback activations
+- `error_category` - Error classification
 
 ## Best Practices
 
-1. **Enable in Production**: Always enable metrics in production for observability
-2. **Use Sampling**: For high-volume services, use sampling to control costs
-3. **Multiple Sinks**: Use OTLP for monitoring and in-memory for debugging
-4. **Custom Attributes**: Add service-specific attributes via filters
-5. **Alert on Metrics**: Set up alerts for error rates, latency spikes, etc.
-6. **Cost Tracking**: Enable cost tracking to monitor LLM expenses
-7. **Batch Configuration**: Tune batch size based on traffic volume
-
-## Troubleshooting
-
-### Metrics Not Appearing
-
-1. Check that metrics are enabled: `config.enabled = True`
-2. Verify sink is added: `collector.add_sink(sink)`
-3. Check sampling rate: `config.request_sampling_rate > 0`
-4. Ensure async operations complete: `await collector.flush()`
-
-### High Memory Usage
-
-1. Reduce in-memory sink size: `InMemoryMetricsSink(max_size=1000)`
-2. Decrease TTL: `InMemoryMetricsSink(ttl_seconds=300)`
-3. Use sampling: `config.request_sampling_rate = 0.1`
-4. Enable batching: `config.batch_size = 100`
-
-### Performance Impact
-
-1. Disable unnecessary features:
-   ```python
-   config.enable_streaming_metrics = False
-   config.enable_cost_tracking = False
-   ```
-2. Increase batch size: `config.batch_size = 500`
-3. Use sampling for high-volume endpoints
-4. Use async sinks to avoid blocking
+1. Enable metrics in production for observability
+2. Use sampling for high-traffic applications
+3. Implement custom sinks for your monitoring stack
+4. Track both successful and failed requests
+5. Monitor retry rates and circuit breaker states
+6. Set appropriate retention periods for in-memory sinks
+7. Use batch processing for performance

@@ -1,14 +1,6 @@
 # Streaming Guide
 
-This guide covers everything you need to know about streaming in the Steer LLM SDK, from basic usage to advanced patterns.
-
-## Overview
-
-The Steer LLM SDK provides a unified streaming architecture that works consistently across all providers (OpenAI, Anthropic, xAI). The streaming system is built on three core components:
-
-1. **StreamingHelper** - High-level orchestration of streaming operations
-2. **EventProcessor** - Pipeline for filtering and transforming events
-3. **StreamAdapter** - Provider-specific normalization
+Complete guide to streaming in the Steer LLM SDK.
 
 ## Quick Start
 
@@ -40,36 +32,23 @@ print(f"Cost: ${response.cost_usd:.4f}")
 
 ## Configuration
 
-### StreamingOptions
-
 Control streaming behavior with `StreamingOptions`:
 
 ```python
-from steer_llm_sdk.models.streaming import StreamingOptions, JSON_MODE_OPTIONS
+from steer_llm_sdk.models.streaming import StreamingOptions
 
-# Custom streaming options
 options = StreamingOptions(
-    # Usage tracking
     enable_usage_aggregation=True,
     aggregator_type="auto",  # auto, tiktoken, character
-    
-    # JSON handling
     enable_json_stream_handler=True,
-    validate_json_incrementally=True,
-    
-    # Connection settings
     connection_timeout=5.0,
     read_timeout=30.0,
     retry_on_connection_error=True,
-    max_reconnect_attempts=3,
-    
-    # Performance
-    chunk_size=1024,
-    buffer_size=8192
+    max_reconnect_attempts=3
 )
 
 response = await client.stream_with_usage(
-    "Generate JSON data",
+    "Generate data",
     model="gpt-4o-mini",
     streaming_options=options
 )
@@ -79,14 +58,14 @@ response = await client.stream_with_usage(
 
 ```python
 from steer_llm_sdk.models.streaming import (
-    JSON_MODE_OPTIONS,      # Optimized for JSON responses
-    HIGH_THROUGHPUT_OPTIONS,  # For maximum performance
-    LOW_LATENCY_OPTIONS      # For real-time applications
+    JSON_MODE_OPTIONS,
+    HIGH_THROUGHPUT_OPTIONS,
+    LOW_LATENCY_OPTIONS
 )
 
 # Use preset for JSON streaming
 response = await client.stream_with_usage(
-    prompt="Generate product data",
+    "Generate product data",
     model="gpt-4o-mini",
     response_format={"type": "json_object"},
     streaming_options=JSON_MODE_OPTIONS
@@ -98,9 +77,6 @@ response = await client.stream_with_usage(
 Handle streaming events in real-time:
 
 ```python
-from steer_llm_sdk.models.streaming import StreamingOptions
-
-# Define event handlers
 async def on_start():
     print("Stream started")
 
@@ -116,7 +92,6 @@ async def on_complete(final_text: str):
 async def on_error(error: Exception):
     print(f"Error: {error}")
 
-# Stream with callbacks
 options = StreamingOptions(
     on_start=on_start,
     on_delta=on_delta,
@@ -134,7 +109,7 @@ await client.stream_with_usage(
 
 ## JSON Mode Streaming
 
-Stream and validate JSON responses incrementally:
+Stream and validate JSON responses:
 
 ```python
 response = await client.stream_with_usage(
@@ -149,53 +124,6 @@ data = response.get_json()
 print(f"Product: {data['name']} - ${data['price']}")
 ```
 
-## Advanced Patterns
-
-### Custom Event Processing
-
-```python
-from steer_llm_sdk.streaming.processor import EventProcessor
-from steer_llm_sdk.models.events import StreamEvent
-
-# Create custom processor
-processor = EventProcessor()
-
-# Add filters
-processor.add_filter(lambda event: event.type != "ping")
-
-# Add transformers
-def uppercase_transformer(event: StreamEvent) -> StreamEvent:
-    if event.type == "text_delta" and event.delta:
-        event.delta = event.delta.upper()
-    return event
-
-processor.add_transformer(uppercase_transformer)
-
-# Use in streaming
-async for event in processor.process(stream):
-    if event.type == "text_delta":
-        print(event.delta, end="")
-```
-
-### Streaming with Agents
-
-```python
-from steer_llm_sdk.agents.runner import AgentRunner
-
-runner = AgentRunner()
-
-# Stream agent responses
-async for event in runner.stream(
-    definition=agent_definition,
-    variables={"query": "Calculate factorial of 10"},
-    options={"streaming": True}
-):
-    if event.type == "delta":
-        print(event.delta, end="")
-    elif event.type == "tool_call":
-        print(f"\n[Tool: {event.metadata['tool']}]")
-```
-
 ## Error Handling
 
 ### Retry Configuration
@@ -205,7 +133,7 @@ options = StreamingOptions(
     retry_on_connection_error=True,
     max_reconnect_attempts=3,
     reconnect_delay=1.0,
-    preserve_partial_response=True  # Keep data from failed attempts
+    preserve_partial_response=True
 )
 
 try:
@@ -223,41 +151,8 @@ except Exception as e:
 ```python
 options = StreamingOptions(
     connection_timeout=5.0,   # Initial connection
-    read_timeout=30.0,       # Between chunks
-    total_timeout=300.0      # Overall limit
-)
-```
-
-## Performance Optimization
-
-### High Throughput Configuration
-
-```python
-from steer_llm_sdk.models.streaming import HIGH_THROUGHPUT_OPTIONS
-
-# Process multiple streams concurrently
-async def process_batch(prompts: list[str]):
-    tasks = []
-    for prompt in prompts:
-        task = client.stream_with_usage(
-            prompt,
-            model="gpt-4o-mini",
-            streaming_options=HIGH_THROUGHPUT_OPTIONS
-        )
-        tasks.append(task)
-    
-    responses = await asyncio.gather(*tasks)
-    return responses
-```
-
-### Memory Management
-
-```python
-# Configure buffer sizes for large responses
-options = StreamingOptions(
-    chunk_size=4096,        # Larger chunks
-    buffer_size=65536,      # Bigger buffer
-    enable_compression=True  # Reduce memory usage
+    read_timeout=30.0,        # Between chunks
+    total_timeout=300.0       # Overall limit
 )
 ```
 
@@ -266,21 +161,18 @@ options = StreamingOptions(
 ### OpenAI
 
 ```python
-# Use OpenAI-specific features
 response = await client.stream_with_usage(
     "Generate code",
     model="gpt-4",
     streaming_options=StreamingOptions(
-        # OpenAI supports usage in stream
-        enable_usage_aggregation=False
+        enable_usage_aggregation=False  # OpenAI provides usage in stream
     )
 )
 ```
 
-### Anthropic
+### Anthropic with Caching
 
 ```python
-# Anthropic with caching
 response = await client.stream_with_usage(
     messages=[
         {"role": "system", "content": "You are helpful", "cache_control": {"type": "ephemeral"}},
@@ -296,30 +188,78 @@ if response.usage.get("cache_info"):
 
 ## Migration from Old API
 
-If you're migrating from the old `return_usage` parameter:
+The `return_usage` parameter has been removed. Use dedicated methods instead:
+
+### Before (Deprecated)
 
 ```python
-# Old way (deprecated)
-response = await client.stream("Hello", "gpt-4", return_usage=True)
-
-# New way
-response = await client.stream_with_usage("Hello", "gpt-4")
+# Old way - using return_usage parameter
+response = await client.stream(
+    "Hello, world!",
+    "gpt-4o-mini",
+    return_usage=True  # Deprecated
+)
 ```
 
-For more details, see the [Streaming API Migration Guide](streaming-api-migration.md).
+### After (Current)
+
+```python
+# For pure streaming (yields chunks)
+async for chunk in client.stream("Hello, world!", "gpt-4o-mini"):
+    print(chunk, end="")
+
+# For streaming with usage data (awaitable)
+response = await client.stream_with_usage("Hello, world!", "gpt-4o-mini")
+print(response.get_text())
+print(response.usage)
+```
+
+### Migration Steps
+
+1. Find code using `stream()` with `return_usage=True`
+2. Replace with `stream_with_usage()` if you need usage data
+3. Replace with `stream()` iterator if you only need text chunks
+
+#### If you need usage data:
+
+```python
+# Before
+response = await client.stream(messages, model, return_usage=True)
+
+# After
+response = await client.stream_with_usage(messages, model)
+```
+
+#### If you only need text:
+
+```python
+# Before
+response = await client.stream(messages, model, return_usage=False)
+text = response.get_text()
+
+# After (more efficient)
+text_chunks = []
+async for chunk in client.stream(messages, model):
+    text_chunks.append(chunk)
+text = ''.join(text_chunks)
+```
+
+### Benefits of Split API
+
+1. **Type Safety**: Clear return types for each method
+2. **Performance**: Pure streaming doesn't collect usage overhead
+3. **Clarity**: Method names clearly indicate their purpose
+
+### Deprecation Timeline
+
+- `return_usage` deprecated in v0.2.0
+- Removed entirely in v0.3.0
 
 ## Best Practices
 
-1. **Use `stream()` for simple text streaming** - When you only need the text
-2. **Use `stream_with_usage()` for complete data** - When you need usage, cost, or metadata
-3. **Configure timeouts appropriately** - Set based on expected response length
-4. **Handle errors gracefully** - Always wrap streaming in try-except blocks
-5. **Use appropriate buffer sizes** - Larger buffers for high-throughput scenarios
-6. **Enable compression for large responses** - Reduces memory usage
-7. **Use callbacks for real-time processing** - Better than post-processing
-
-## Related Documentation
-
-- [Architecture Overview](../architecture/streaming.md) - Technical details of the streaming system
-- [Event Reference](streaming-events.md) - Complete list of streaming events
-- [Performance Guide](streaming-performance.md) - Optimization techniques
+1. Use `stream()` for simple text streaming when you only need the text
+2. Use `stream_with_usage()` for complete data (usage, cost, metadata)
+3. Configure timeouts appropriately based on expected response length
+4. Handle errors gracefully with try-except blocks
+5. Use appropriate buffer sizes for high-throughput scenarios
+6. Use callbacks for real-time processing instead of post-processing

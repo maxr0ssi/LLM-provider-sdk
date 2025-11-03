@@ -13,18 +13,18 @@ Every time I started a new project that needed LLM capabilities, I faced the sam
 - Managing API keys and costs separately
 - Building the same tool-calling patterns over and over
 
-**This SDK is my answer:** A battle-tested, production-ready package that I can drop into any project and immediately have access to any LLM I want, with all the infrastructure already built.
+**This SDK is my answer:** A production-ready package that I can drop into any project and immediately have access to any LLM I want, with all the infrastructure already built.
 
 ## What This Gives You
 
-- **Instant access** to GPT-4, Claude, Grok, and more - switch models with one parameter
+- **Instant access** to OpenAi, Claude and Grok switch models with one parameter
 - **Unified interface** - learn once, use with any provider
 - **Production-ready** from day one - retries, circuit breakers, and error handling included
 - **No more rewriting** - tools, agents, and streaming patterns ready to use
 
 ## Key Features
 
-### 🔄 One Interface, All Providers
+### One Interface, All Providers
 ```python
 # Same code works with any model
 response = await client.generate("Explain AI", model="gpt-4o-mini")
@@ -32,28 +32,28 @@ response = await client.generate("Explain AI", model="claude-3-haiku-20240307")
 response = await client.generate("Explain AI", model="grok-3-mini")
 ```
 
-### 🚀 Streaming That Just Works
+### Streaming
 - Unified streaming that handles each provider's quirks
 - Consistent behavior across OpenAI, Anthropic, and xAI
 - Built-in usage tracking and cost calculation
 
-### 🔧 Build Complex Workflows Once
+### Build Complex Workflows Once
 - Sequential tool calling for multi-step operations
 - Agent infrastructure with OpenAI Agents SDK
 - Reusable patterns for common tasks
 
-### 💰 Track Everything Automatically
+### Track Spending Automatically
 - Real-time cost calculation across all providers
 - Token usage tracking with cache awareness
 - Configurable pricing overrides
 
-### 🛡️ Production-Ready Infrastructure
+### Production-Ready Infrastructure
 - Circuit breakers per provider
 - Intelligent retry with exponential backoff
 - Idempotency support for safe retries
 - Comprehensive error handling
 
-### 📊 Built-in Observability
+### Built-in Observability
 - Metrics collection and tracing
 - Performance monitoring
 - Pluggable sinks for any monitoring system
@@ -195,9 +195,9 @@ Clean, layered architecture that's easy to extend:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                 Your Application                         │
+│                 Your Application                        │
 ├─────────────────────────────────────────────────────────┤
-│              SteerLLMClient (Unified API)                │
+│              SteerLLMClient (Unified API)               │
 ├─────────────────────────────────────────────────────────┤
 │     Streaming Layer (Normalizes all providers)          │
 ├─────────────────────────────────────────────────────────┤
@@ -308,7 +308,5 @@ print(f"Analysis complete. Total cost: ${result.usage.get('cost_usd', 0):.6f}")
 GPL-3.0 - see [LICENSE](LICENSE). This ensures the SDK remains open and improvements benefit everyone.
 
 ---
-
-*Built because I needed it. Shared because you might need it too.*
 
 **Created by Max Rossi** | [GitHub](https://github.com/maxr0ssi)
