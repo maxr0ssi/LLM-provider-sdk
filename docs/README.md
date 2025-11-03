@@ -12,6 +12,7 @@ Welcome to the Steer LLM SDK documentation. This directory contains comprehensiv
 ### Getting Started
 - [Chat Completions Guide](guides/chat-completions.md) - Basic usage patterns
 - [Streaming Guide](guides/streaming.md) - Complete streaming implementation
+- [Structured Outputs](guides/structured-outputs.md) - Deterministic generation and schemas
 - [Configuration Guide](configuration/) - Provider and system setup
 
 ### Architecture
@@ -24,12 +25,10 @@ Welcome to the Steer LLM SDK documentation. This directory contains comprehensiv
 - [Orchestration Guide](orchestration/) - Tool-based execution with reliability
 - [Agent Runtime](guides/agent-runtime-integration.md) - Building AI agents
 - [OpenAI Agents SDK](integrations/openai-agents/) - Native agent integration
-- [Responses API](guides/responses-api-advanced.md) - GPT-5 advanced features
+- [Observability](guides/observability.md) - Metrics and monitoring
 
 ### Integration
 - [HTTP Endpoints](guides/http-endpoints.md) - REST API reference
-- [Nexus Integration](architecture/projects/nexus/) - Agent mesh platform
-- [Custom Metrics](guides/custom-sinks.md) - Observability extensions
 
 ## Recent Updates
 

@@ -53,6 +53,8 @@ MODEL_CONFIGS = {
         "description": "Enhanced GPT-4 with improved reasoning and larger context window",
         "max_tokens": 16384,
         "context_length": 128000,
+        "input_cost_per_1k_tokens": 0.002,
+        "output_cost_per_1k_tokens": 0.008,
         "cached_input_cost_per_1k_tokens": 0.0005
     }),
     
@@ -74,6 +76,8 @@ MODEL_CONFIGS = {
         "description": "OpenAI's most advanced flagship model with superior reasoning capabilities",
         "max_tokens": 32768,
         "context_length": 256000,
+        "input_cost_per_1k_tokens": 0.00125,
+        "output_cost_per_1k_tokens": 0.01,
         "cached_input_cost_per_1k_tokens": 0.000125
     }),
     
@@ -87,7 +91,49 @@ MODEL_CONFIGS = {
         "output_cost_per_1k_tokens": 0.0004,
         "cached_input_cost_per_1k_tokens": 0.000005
     }),
-    
+
+    "gpt-5-chat-latest": create_model_config("gpt-5", "gpt-5-chat-latest", {
+        "name": "GPT-5 Chat Latest",
+        "display_name": "GPT-5 Chat Latest",
+        "description": "Latest GPT-5 optimized for chat applications",
+        "max_tokens": 32768,
+        "context_length": 256000,
+        "input_cost_per_1k_tokens": 0.00125,
+        "output_cost_per_1k_tokens": 0.01,
+        "cached_input_cost_per_1k_tokens": 0.000125
+    }),
+
+    "gpt-5-codex": create_model_config("gpt-5", "gpt-5-codex", {
+        "name": "GPT-5 Codex",
+        "display_name": "GPT-5 Codex",
+        "description": "GPT-5 optimized for code generation and understanding",
+        "max_tokens": 32768,
+        "context_length": 256000,
+        "input_cost_per_1k_tokens": 0.00125,
+        "output_cost_per_1k_tokens": 0.01,
+        "cached_input_cost_per_1k_tokens": 0.000125
+    }),
+
+    "gpt-5-pro": create_model_config("gpt-5", "gpt-5-pro", {
+        "name": "GPT-5 Pro",
+        "display_name": "GPT-5 Pro",
+        "description": "Premium GPT-5 model with maximum capabilities",
+        "max_tokens": 32768,
+        "context_length": 256000,
+        "input_cost_per_1k_tokens": 0.015,
+        "output_cost_per_1k_tokens": 0.12
+    }),
+
+    "gpt-4o-2024-05-13": create_model_config("gpt-4", "gpt-4o-2024-05-13", {
+        "name": "GPT-4o (2024-05-13)",
+        "display_name": "GPT-4o (2024-05-13)",
+        "description": "Specific GPT-4o snapshot from May 2024",
+        "max_tokens": 16384,
+        "context_length": 128000,
+        "input_cost_per_1k_tokens": 0.005,
+        "output_cost_per_1k_tokens": 0.015
+    }),
+
     # Legacy models (not using family inheritance)
     "gpt-3.5-turbo": {
         "name": "GPT-3.5 Turbo",
