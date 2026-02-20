@@ -203,6 +203,7 @@ class TestMetricsCollector:
         """Test metric sampling."""
         config = MetricsConfig(
             enabled=True,
+            batch_size=1,
             request_sampling_rate=0.5  # 50% sampling
         )
         collector = MetricsCollector(config)
@@ -224,9 +225,10 @@ class TestMetricsCollector:
         class OnlyGPT4Filter:
             def should_collect(self, metric):
                 return metric.model == "gpt-4"
-        
+
         config = MetricsConfig(
             enabled=True,
+            batch_size=1,
             filters=[OnlyGPT4Filter()]
         )
         collector = MetricsCollector(config)
