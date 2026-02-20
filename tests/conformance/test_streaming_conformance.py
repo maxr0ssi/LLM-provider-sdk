@@ -202,18 +202,17 @@ class TestStreamingConformance:
         assert delta.get_text() == "Hello xAI"
         assert delta.provider == "xai"
     
-    def test_stream_adapter_metrics(self):
+    async def test_stream_adapter_metrics(self):
         """Test that StreamAdapter tracks metrics correctly."""
         adapter = StreamAdapter("test")
-        
+
         # Start streaming
-        import asyncio
-        asyncio.get_event_loop().run_until_complete(adapter.start_stream())
-        
+        await adapter.start_stream()
+
         # Track some chunks
-        asyncio.get_event_loop().run_until_complete(adapter.track_chunk(10))
-        asyncio.get_event_loop().run_until_complete(adapter.track_chunk(15))
-        asyncio.get_event_loop().run_until_complete(adapter.track_chunk(20))
+        await adapter.track_chunk(10)
+        await adapter.track_chunk(15)
+        await adapter.track_chunk(20)
         
         # Get metrics
         metrics = adapter.get_metrics()
