@@ -28,6 +28,7 @@ from .core.routing import (
     normalize_params,
 )
 # Router instance removed - create with SteerLLMClient instead
+from .agents.models.stream_event import StreamEvent
 from .models.conversation_types import ConversationMessage
 from .models.conversation_types import TurnRole as ConversationRole
 from .models.generation import (
@@ -62,5 +63,8 @@ __all__ = [
     "GenerationResponse",
     "ModelConfig",
     "ConversationMessage",
-    "ConversationRole"
+    "ConversationRole",
+
+    # Streaming
+    "StreamEvent",
 ]

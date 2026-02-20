@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from typing import Any, AsyncGenerator, Dict, Optional, Union
+
+from ..models.stream_event import StreamEvent
 
 from ...core.capabilities import get_capabilities_for_model
 from ...core.routing import LLMRouter, get_config
@@ -22,6 +25,8 @@ from ..models.agent_options import AgentOptions
 from ..models.agent_result import AgentResult
 from ..validators.json_schema import validate_json_schema
 from .determinism import apply_deterministic_policy
+
+logger = logging.getLogger(__name__)
 
 
 class AgentRunner:
@@ -174,8 +179,8 @@ class AgentRunner:
                 agent_metrics.tools_used = [t.name for t in (definition.tools or [])]
                 try:
                     await self.metrics_sink.record(agent_metrics)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Metrics recording failed: {e}")
             if opts.idempotency_key:
                 self.idempotency.store_result(opts.idempotency_key, result)
             return result
@@ -252,11 +257,11 @@ class AgentRunner:
         definition: AgentDefinition,
         variables: Dict[str, Any] = None,
         opts: AgentOptions = None
-    ) -> AsyncGenerator[str, None]:
-        """Stream agent response chunks as they arrive.
+    ) -> AsyncGenerator[StreamEvent, None]:
+        """Stream structured events as they arrive.
 
-        This yields text chunks token-by-token, similar to SteerLLMClient.stream().
-        Uses the existing streaming infrastructure via runtime adapters.
+        Yields ``StreamEvent`` instances so callers can distinguish plain text
+        from tool calls and other semantic events.
 
         Args:
             definition: Agent definition with system prompt, tools, etc.
@@ -264,7 +269,7 @@ class AgentRunner:
             opts: Agent options (must specify runtime)
 
         Yields:
-            Text chunks from the agent's response
+            StreamEvent instances (type="text", "tool_call", etc.)
 
         Raises:
             ProviderError: If streaming fails
@@ -307,19 +312,32 @@ class AgentRunner:
 
         # Callback to capture chunks
         async def on_delta(event):
-            """Capture delta events and put text in queue."""
+            """Capture delta events and put structured StreamEvents in queue."""
             nonlocal stream_error
             try:
-                text = event.get_text() if hasattr(event, 'get_text') else str(event)
-                if text:
-                    await chunk_queue.put(text)
+                if isinstance(event, dict):
+                    # Semantic / tool event from runtime adapter
+                    event_type = event.get("type", "tool_call")
+                    se = StreamEvent(
+                        type=event_type,
+                        tool=event.get("tool", ""),
+                        content=event.get("content", ""),
+                        metadata={k: v for k, v in event.items() if k not in ("type", "tool", "content")},
+                    )
+                    await chunk_queue.put(se)
+                else:
+                    # Plain text chunk
+                    text = event.get_text() if hasattr(event, 'get_text') else str(event)
+                    if text:
+                        await chunk_queue.put(StreamEvent(type="text", content=text))
             except Exception as e:
                 stream_error = e
 
         async def on_error(error):
-            """Capture errors."""
+            """Capture errors and enqueue an error event."""
             nonlocal stream_error
             stream_error = error
+            await chunk_queue.put(StreamEvent(type="error", content=str(error)))
             stream_done.set()
 
         async def on_complete(event):
@@ -499,8 +517,8 @@ class AgentRunner:
                 agent_metrics.tools_used = [t.name for t in (definition.tools or [])]
                 try:
                     await self.metrics_sink.record(agent_metrics)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Metrics recording failed: {e}")
             
             # Store in idempotency cache
             if opts.idempotency_key:
@@ -532,8 +550,8 @@ class AgentRunner:
                 agent_metrics.tools_used = [t.name for t in (definition.tools or [])]
                 try:
                     await self.metrics_sink.record(agent_metrics)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Metrics recording failed: {e}")
             
             # Re-raise as ProviderError
             raise ProviderError(str(e), provider=runtime_name)

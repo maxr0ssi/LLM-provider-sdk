@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, Dict, Any, List, Union
 from enum import Enum
 
@@ -53,9 +53,8 @@ class GenerationParams(BaseModel):
     top_k: Optional[int] = Field(None, ge=0, description="Top-k sampling (Anthropic)")
     logprobs: Optional[bool] = Field(None, description="Return log probabilities (OpenAI)")
     
-    class Config:
-        extra = "allow"  # Allow additional fields to pass through
-    
+    model_config = ConfigDict(extra="allow")
+
     @field_validator('max_tokens')
     def validate_max_tokens(cls, v):
         return min(max(v, 1), 16384)  # Increased limit

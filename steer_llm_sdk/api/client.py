@@ -276,7 +276,7 @@ class SteerLLMClient:
                     import json
                     final_json = json.loads(text)
                     response_wrapper.set_final_json(final_json)
-                except:
+                except (json.JSONDecodeError, ValueError):
                     pass  # Invalid JSON, keep as text
             
             # Set TTFT if available

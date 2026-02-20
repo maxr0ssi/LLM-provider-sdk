@@ -11,12 +11,14 @@ from .models.agent_definition import (
     AgentResult,
     Budget
 )
+from .models.stream_event import StreamEvent
 from ..core.capabilities import ProviderCapabilities
 
 __all__ = [
     "AgentDefinition",
-    "AgentOptions", 
+    "AgentOptions",
     "AgentResult",
     "Budget",
-    "ProviderCapabilities"
+    "ProviderCapabilities",
+    "StreamEvent",
 ]

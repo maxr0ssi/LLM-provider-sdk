@@ -1,7 +1,7 @@
 """Configuration options for orchestrator behavior."""
 
 from typing import Optional, Dict, Any, Callable, Awaitable
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class OrchestrationConfig(BaseModel):
@@ -121,6 +121,4 @@ class OrchestrationConfig(BaseModel):
                 
         return v
     
-    class Config:
-        """Pydantic configuration."""
-        arbitrary_types_allowed = True  # For Callable type
+    model_config = ConfigDict(arbitrary_types_allowed=True)
