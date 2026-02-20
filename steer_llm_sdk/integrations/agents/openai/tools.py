@@ -6,7 +6,7 @@ function_tool format, handling parameter schemas and async functions.
 
 import asyncio
 import inspect
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 from functools import wraps
 
 from ....agents.models.agent_definition import Tool
@@ -47,11 +47,6 @@ def create_tool_wrapper(tool: Tool) -> Callable:
         param_info = tool.parameters["properties"]
     if "required" in tool.parameters:
         required_params = set(tool.parameters["required"])
-
-    # Create wrapper based on sync/async nature
-    # Use inspect to create proper function signature dynamically
-    import inspect
-    from typing import Optional
 
     # Build parameter list for signature
     sig_params = []

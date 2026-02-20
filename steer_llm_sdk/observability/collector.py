@@ -8,6 +8,7 @@ with the router, client, and streaming components to gather comprehensive metric
 from __future__ import annotations
 
 import asyncio
+import random
 import time
 import logging
 from typing import Optional, List, Dict, Any, Protocol, Set
@@ -298,8 +299,6 @@ class MetricsCollector:
     
     def _should_sample(self, metric: BaseMetrics) -> bool:
         """Check if a metric should be sampled."""
-        import random
-        
         if isinstance(metric, RequestMetrics):
             return random.random() < self.config.request_sampling_rate
         elif isinstance(metric, StreamingMetrics):
@@ -336,12 +335,20 @@ class MetricsCollector:
         # Convert to AgentMetrics for backward compatibility if needed
         if isinstance(metric, RequestMetrics):
             agent_metrics = AgentMetrics.from_request_metrics(metric)
-            
-            for sink in self.sinks:
-                try:
-                    await sink.record(agent_metrics)
-                except Exception as e:
-                    logger.error(f"Error sending metric to {type(sink).__name__}: {e}")
+        elif isinstance(metric, ErrorMetrics):
+            agent_metrics = AgentMetrics(
+                request_id=metric.request_id,
+                model=metric.model or "",
+                error_class=metric.error_type,
+            )
+        else:
+            return  # StreamingMetrics, ReliabilityMetrics — no AgentMetrics equivalent yet
+
+        for sink in self.sinks:
+            try:
+                await sink.record(agent_metrics)
+            except Exception as e:
+                logger.error(f"Error sending metric to {type(sink).__name__}: {e}")
     
     def _start_batch_processor(self) -> None:
         """Start the background batch processor."""

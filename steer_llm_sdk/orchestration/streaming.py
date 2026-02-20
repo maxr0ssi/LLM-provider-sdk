@@ -217,8 +217,6 @@ class OrchestratorEventManager:
             request_id: Request ID
         """
         if self.base_manager.on_error:
-            from ..models.events import StreamErrorEvent
-            
             event = StreamErrorEvent(
                 error=Exception(error.get('message', 'Tool execution failed')),
                 error_type=error.get('type', 'ToolError'),

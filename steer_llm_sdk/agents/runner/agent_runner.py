@@ -17,6 +17,7 @@ from ...providers.base import ProviderError
 from ...reliability.budget import clamp_params_to_budget
 from ...reliability.idempotency import IdempotencyManager
 from ...reliability.retry import RetryConfig, RetryManager
+from ...integrations.agents.streaming import AgentStreamingBridge
 from ...streaming.adapter import StreamAdapter
 from ...streaming.manager import EventManager
 from ...streaming.helpers import StreamingHelper
@@ -435,7 +436,6 @@ class AgentRunner:
                 )
                 
                 # Create a result collector to aggregate streaming data
-                from ...integrations.agents.streaming import AgentStreamingBridge
                 result_collector = None
                 
                 # Run streaming (yields nothing, emits events)

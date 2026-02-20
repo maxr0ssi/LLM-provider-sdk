@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 from dataclasses import dataclass
 from typing import Callable, Iterable, Type, Optional
 
@@ -84,7 +85,6 @@ class RetryManager:
             return min(error.retry_after, config.max_delay)
         
         # Add jitter to prevent thundering herd
-        import random
         jitter = random.uniform(0, 0.1 * base_delay)
         
         return min(base_delay + jitter, config.max_delay)
