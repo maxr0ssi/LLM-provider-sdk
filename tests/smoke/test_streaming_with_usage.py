@@ -1,10 +1,12 @@
 """Test streaming responses with usage data."""
 
 import asyncio
+import os
 import pytest
 from steer_llm_sdk import SteerLLMClient, ConversationMessage, ConversationRole
 
 
+@pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="Requires OPENAI_API_KEY")
 @pytest.mark.asyncio
 async def test_stream_with_usage_openai():
     """Test streaming with usage data for OpenAI."""
@@ -44,6 +46,7 @@ async def test_stream_with_usage_openai():
     print(f"Cost: ${response.cost_usd:.6f}" if response.cost_usd else "Cost: N/A")
 
 
+@pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="Requires OPENAI_API_KEY")
 @pytest.mark.asyncio
 async def test_stream_backwards_compatible():
     """Test that streaming without return_usage works as before."""
@@ -68,6 +71,7 @@ async def test_stream_backwards_compatible():
     print(f"Backwards compatible streaming result: {full_text}")
 
 
+@pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"), reason="Requires ANTHROPIC_API_KEY")
 @pytest.mark.asyncio
 async def test_stream_with_usage_anthropic():
     """Test streaming with usage data for Anthropic."""
@@ -106,7 +110,8 @@ async def test_stream_with_usage_anthropic():
     print(f"Anthropic usage: {response.usage}")
 
 
-@pytest.mark.asyncio 
+@pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="Requires OPENAI_API_KEY")
+@pytest.mark.asyncio
 async def test_stream_with_usage_json_format():
     """Test streaming with JSON response format and usage data."""
     client = SteerLLMClient()
