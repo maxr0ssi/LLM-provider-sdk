@@ -16,10 +16,11 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import uuid
 
+from .metrics import AgentMetrics
 from .models import (
-    BaseMetrics, RequestMetrics, StreamingMetrics, 
+    BaseMetrics, RequestMetrics, StreamingMetrics,
     ReliabilityMetrics, UsageMetrics, ErrorMetrics,
-    MetricsBatch, AgentMetrics
+    MetricsBatch
 )
 from .sinks.base import MetricsSink
 

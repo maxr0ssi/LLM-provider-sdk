@@ -7,7 +7,8 @@ This layer handles:
 - Integration with external monitoring systems
 """
 
-from .metrics import AgentMetrics, MetricsSink
+from .metrics import AgentMetrics
+from .sinks.base import MetricsSink
 from .models import (
     BaseMetrics, RequestMetrics, StreamingMetrics, 
     ReliabilityMetrics, UsageMetrics, ErrorMetrics,
