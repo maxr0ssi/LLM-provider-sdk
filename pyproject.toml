@@ -75,4 +75,5 @@ python_files = ["test_*.py", "*_test.py"]
 asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "smoke: marks tests requiring live API keys",
 ]
