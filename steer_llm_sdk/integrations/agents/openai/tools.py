@@ -99,9 +99,11 @@ def create_tool_wrapper(tool: Tool) -> Callable:
             }
             return handler(**filtered_kwargs)
 
-    # Apply signature to wrapper
+    # Apply signature and annotations to wrapper
     wrapper.__signature__ = inspect.Signature(parameters=sig_params, return_annotation=Any)
-    
+    wrapper.__annotations__ = {p.name: p.annotation for p in sig_params}
+    wrapper.__annotations__["return"] = Any
+
     # Set function metadata
     wrapper.__name__ = tool.name
     wrapper.__doc__ = tool.description

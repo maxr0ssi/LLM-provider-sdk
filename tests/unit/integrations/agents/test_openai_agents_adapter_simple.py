@@ -41,37 +41,36 @@ def mock_openai_sdk():
                 "total_tokens": 30
             }
             mock_result.tool_calls = []  # No tool calls in basic test
-            mock_runner.run_sync.return_value = mock_result
-            
-            # Mock streaming with correct SDK event types
-            async def mock_run_streamed(agent, input_text):
-                # Emit raw_response_event with content
-                mock_choice = Mock()
-                mock_delta = Mock()
-                mock_delta.content = "Test "
-                mock_choice.delta = mock_delta
-                mock_data = Mock()
-                mock_data.choices = [mock_choice]
-                mock_data.usage = None
-                yield Mock(type="raw_response_event", data=mock_data)
-                
-                # Second content chunk
-                mock_choice2 = Mock()
-                mock_delta2 = Mock()
-                mock_delta2.content = "response"
-                mock_choice2.delta = mock_delta2
-                mock_data2 = Mock()
-                mock_data2.choices = [mock_choice2]
-                mock_data2.usage = None
-                yield Mock(type="raw_response_event", data=mock_data2)
-                
-                # Final event with usage
-                mock_data3 = Mock()
-                mock_data3.choices = []
-                mock_data3.usage = {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
-                yield Mock(type="raw_response_event", data=mock_data3)
-            
-            mock_runner.run_streamed = mock_run_streamed
+            mock_runner.run = AsyncMock(return_value=mock_result)
+
+            # Mock streaming: run_streamed returns object with stream_events()
+            class MockStreamResult:
+                async def stream_events(self):
+                    # Emit raw_response_event with content
+                    mock_choice = Mock()
+                    mock_choice.delta = Mock(content="Test ")
+                    mock_data = Mock(choices=[mock_choice], usage=None)
+                    event = Mock(type="raw_response_event", data=mock_data)
+                    type(event).__name__ = "RawResponsesStreamEvent"
+                    yield event
+
+                    # Second content chunk
+                    mock_choice2 = Mock()
+                    mock_choice2.delta = Mock(content="response")
+                    mock_data2 = Mock(choices=[mock_choice2], usage=None)
+                    event2 = Mock(type="raw_response_event", data=mock_data2)
+                    type(event2).__name__ = "RawResponsesStreamEvent"
+                    yield event2
+
+                    # Final event with usage
+                    mock_data3 = Mock(choices=[], usage={
+                        "prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30
+                    })
+                    event3 = Mock(type="raw_response_event", data=mock_data3)
+                    type(event3).__name__ = "RawResponsesStreamEvent"
+                    yield event3
+
+            mock_runner.run_streamed = Mock(return_value=MockStreamResult())
             
             # Mock function_tool decorator
             def mock_function_tool(func):
@@ -86,12 +85,16 @@ def mock_openai_sdk():
                     self.error_message = error_message
             
             # Mock Agent constructor to set guardrails properly
-            def mock_agent_constructor(name, instructions, tools=None, model_settings=None, guardrails=None):
+            def mock_agent_constructor(name, instructions, model=None, tools=None, model_settings=None,
+                                       output_guardrails=None, input_guardrails=None, guardrails=None, **kwargs):
                 mock_agent.name = name
                 mock_agent.instructions = instructions
+                mock_agent.model = model
                 mock_agent.tools = tools or []
                 mock_agent.model_settings = model_settings or {}
-                mock_agent.guardrails = guardrails or []
+                mock_agent.guardrails = guardrails or output_guardrails or []
+                mock_agent.output_guardrails = output_guardrails or []
+                mock_agent.input_guardrails = input_guardrails or []
                 return mock_agent
             
             with patch('steer_llm_sdk.integrations.agents.openai.adapter.Agent', side_effect=mock_agent_constructor):
@@ -230,45 +233,50 @@ class TestOpenAIAgentAdapterSimple:
         assert result.runtime == "openai_agents"
         assert result.cost_usd == mock_cost
         
-        # Verify Runner.run_sync was called
-        mock_openai_sdk['runner'].run_sync.assert_called()
+        # Verify Runner.run was called
+        mock_openai_sdk['runner'].run.assert_called()
     
     @pytest.mark.asyncio
     async def test_run_streaming(self, mock_env, mock_openai_sdk, mock_capabilities, mock_normalize, mock_cost, sample_definition):
         """Test streaming execution."""
         from steer_llm_sdk.integrations.agents.openai.adapter import OpenAIAgentAdapter
-        
+
         adapter = OpenAIAgentAdapter()
         options = AgentRunOptions(runtime="openai_agents", streaming=True)
-        
+
         prepared = await adapter.prepare(sample_definition, options)
-        
-        # Mock event manager
+
+        # Use real EventManager with capture callbacks
         events = []
-        event_manager = Mock(spec=EventManager)
-        
-        async def capture_event(event):
+
+        async def capture(event):
             events.append(event)
-        
-        event_manager.emit_event = AsyncMock(side_effect=capture_event)
-        
+
+        event_manager = EventManager(
+            on_start=capture,
+            on_delta=capture,
+            on_usage=capture,
+            on_complete=capture,
+            on_error=capture,
+        )
+
         # Run streaming
         async for _ in adapter.run_stream(prepared, {"query": "test"}, event_manager):
             pass
-        
+
         # Verify events were emitted
         assert len(events) > 0
-        
+
         # Check event types
         event_types = [type(e).__name__ for e in events]
         assert "StreamStartEvent" in event_types
         assert "StreamDeltaEvent" in event_types
         assert "StreamUsageEvent" in event_types
         assert "StreamCompleteEvent" in event_types
-        
+
         # Check content
         delta_events = [e for e in events if isinstance(e, StreamDeltaEvent)]
-        content = "".join(e.delta for e in delta_events if e.delta)
+        content = "".join(e.delta for e in delta_events if hasattr(e, 'delta') and isinstance(e.delta, str))
         assert content == "Test response"
     
     @pytest.mark.asyncio
@@ -313,7 +321,7 @@ class TestOpenAIAgentAdapterSimple:
         from steer_llm_sdk.integrations.agents.openai.adapter import OpenAIAgentAdapter
         
         # Make runner raise an error
-        mock_openai_sdk['runner'].run_sync.side_effect = Exception("Rate limit exceeded")
+        mock_openai_sdk['runner'].run.side_effect = Exception("Rate limit exceeded")
         
         adapter = OpenAIAgentAdapter()
         options = AgentRunOptions(runtime="openai_agents")
