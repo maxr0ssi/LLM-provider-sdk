@@ -21,9 +21,8 @@ from ...integrations.agents.streaming import AgentStreamingBridge
 from ...streaming.adapter import StreamAdapter
 from ...streaming.manager import EventManager
 from ...streaming.helpers import StreamingHelper
-from ..models.agent_definition import AgentDefinition
+from ..models.agent_definition import AgentDefinition, AgentResult
 from ..models.agent_options import AgentOptions
-from ..models.agent_result import AgentResult
 from ..validators.json_schema import validate_json_schema
 from .determinism import apply_deterministic_policy
 
