@@ -1,5 +1,6 @@
 """Unit tests for EventManager factory methods with metadata enrichment."""
 
+import re
 import pytest
 import time
 from unittest.mock import AsyncMock, MagicMock
@@ -216,7 +217,8 @@ class TestEventManagerFactory:
         
         # Should have some SDK version (either real or "unknown")
         assert "sdk_version" in event.metadata
-        assert event.metadata["sdk_version"] in ["0.2.1", "unknown"]
+        version = event.metadata["sdk_version"]
+        assert version == "unknown" or re.match(r"\d+\.\d+\.\d+", version)
 
 
 @pytest.mark.asyncio

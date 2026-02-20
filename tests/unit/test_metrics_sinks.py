@@ -184,10 +184,10 @@ class TestOTelMetricsSink:
     @pytest.mark.asyncio
     async def test_disabled_when_otel_missing(self):
         """Test that sink is disabled when OpenTelemetry is not available."""
-        with patch.dict('sys.modules', {'opentelemetry': None}):
+        with patch('steer_llm_sdk.observability.sinks.otlp.metrics', None):
             sink = OTelMetricsSink()
             assert not sink.enabled
-            
+
             # Should not error when recording
             await sink.record(AgentMetrics(model="gpt-4", latency_ms=100))
             await sink.flush()

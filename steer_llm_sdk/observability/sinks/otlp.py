@@ -7,6 +7,12 @@ from .base import MetricsSink
 
 logger = logging.getLogger(__name__)
 
+# Optional dependency — import at module level so tests can patch it
+try:
+    from opentelemetry import metrics  # type: ignore
+except Exception:
+    metrics = None  # type: ignore[assignment]
+
 
 class OTelMetricsSink(MetricsSink):
     """Optional OpenTelemetry metrics sink (best-effort, no hard dep).
@@ -17,17 +23,15 @@ class OTelMetricsSink(MetricsSink):
     def __init__(self, service_name: str = "steer_llm_sdk", namespace: str = "llm") -> None:
         """
         Initialize OTLP metrics sink.
-        
+
         Args:
             service_name: Service name for metrics
             namespace: Metric namespace prefix
         """
         self.service_name = service_name
         self.namespace = namespace
-        
-        try:
-            from opentelemetry import metrics  # type: ignore
-        except Exception:
+
+        if metrics is None:
             logger.warning("OpenTelemetry not available, metrics will be disabled")
             self.enabled = False
             self._meter = None

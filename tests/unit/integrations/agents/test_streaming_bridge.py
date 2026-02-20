@@ -17,11 +17,11 @@ from steer_llm_sdk.models.events import (
 
 class TestAgentStreamingBridge:
     """Test AgentStreamingBridge functionality."""
-    
+
     @pytest.fixture
     def mock_event_manager(self):
-        """Create mock EventManager."""
-        manager = Mock(spec=EventManager)
+        """Create EventManager that records emitted events."""
+        manager = EventManager(request_id="test-123")
         manager.emit_event = AsyncMock()
         return manager
     
