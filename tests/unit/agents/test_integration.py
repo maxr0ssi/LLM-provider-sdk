@@ -48,21 +48,19 @@ class TestAgentFrameworkIntegration:
     
     def test_agent_options_with_budget(self):
         """Test agent options integrate with budget constraints."""
-        # Create options with budget
-        budget = Budget(tokens=1000, ms=5000)
+        # Create options with budget (canonical AgentOptions uses Dict, not Budget)
         options = AgentOptions(
             streaming=True,
             deterministic=True,
-            budget=budget,
+            budget={"tokens": 1000, "ms": 5000},
             metadata={"task": "extraction"},
             trace_id="test-123"
         )
-        
+
         # Verify serialization works
         options_dict = options.model_dump(exclude_none=True)
         assert options_dict["budget"]["tokens"] == 1000
         assert options_dict["budget"]["ms"] == 5000
-        assert "on_start" not in options_dict  # Callbacks excluded
     
     def test_result_validation_with_schema(self):
         """Test result content validation against agent schema."""

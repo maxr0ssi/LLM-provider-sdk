@@ -43,25 +43,6 @@ class AgentDefinition(BaseModel):
     version: str = Field("1.0", description="Agent version")
 
 
-class AgentOptions(BaseModel):
-    """Runtime options for agent execution."""
-    model_config = ConfigDict(extra="forbid")
-    
-    streaming: bool = Field(False, description="Enable streaming")
-    deterministic: bool = Field(False, description="Enable deterministic mode")
-    budget: Optional[Budget] = Field(None, description="Execution budget")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-    idempotency_key: Optional[str] = Field(None, description="Idempotency key for deduplication")
-    trace_id: Optional[str] = Field(None, description="Trace ID for observability")
-    
-    # Streaming callbacks (will be set programmatically, not via JSON)
-    on_start: Optional[Callable] = Field(None, exclude=True)
-    on_delta: Optional[Callable] = Field(None, exclude=True)
-    on_usage: Optional[Callable] = Field(None, exclude=True)
-    on_complete: Optional[Callable] = Field(None, exclude=True)
-    on_error: Optional[Callable] = Field(None, exclude=True)
-
-
 class AgentResult(BaseModel):
     """Result from agent execution."""
     model_config = ConfigDict(extra="allow")  # Allow extra fields for provider metadata

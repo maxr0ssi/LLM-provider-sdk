@@ -7,11 +7,11 @@ from pydantic import ValidationError
 
 from steer_llm_sdk.agents.models.agent_definition import (
     AgentDefinition,
-    AgentOptions,
     AgentResult,
     Budget,
     Tool
 )
+from steer_llm_sdk.agents.models.agent_options import AgentOptions
 
 
 class TestBudget:
@@ -160,7 +160,7 @@ class TestAgentOptions:
     
     def test_options_with_budget(self):
         """Test options with budget."""
-        budget = Budget(tokens=500, ms=2000)
+        budget = {"tokens": 500, "ms": 2000}
         options = AgentOptions(
             streaming=True,
             deterministic=True,
@@ -168,8 +168,8 @@ class TestAgentOptions:
         )
         assert options.streaming is True
         assert options.deterministic is True
-        assert options.budget.tokens == 500
-        assert options.budget.ms == 2000
+        assert options.budget["tokens"] == 500
+        assert options.budget["ms"] == 2000
     
     def test_options_with_metadata(self):
         """Test options with metadata."""
@@ -180,22 +180,6 @@ class TestAgentOptions:
         assert options.metadata["user_id"] == "123"
         assert options.trace_id == "trace-123"
     
-    def test_callback_exclusion(self):
-        """Test that callbacks are excluded from serialization."""
-        def dummy_callback():
-            pass
-        
-        options = AgentOptions(
-            on_start=dummy_callback,
-            on_delta=dummy_callback
-        )
-        
-        # Callbacks should be excluded from dict
-        options_dict = options.model_dump()
-        assert "on_start" not in options_dict
-        assert "on_delta" not in options_dict
-
-
 class TestAgentResult:
     """Test AgentResult model."""
     

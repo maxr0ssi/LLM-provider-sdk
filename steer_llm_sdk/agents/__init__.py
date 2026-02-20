@@ -7,10 +7,10 @@ deterministic execution, optional local tools, and evented streaming.
 
 from .models.agent_definition import (
     AgentDefinition,
-    AgentOptions,
     AgentResult,
     Budget
 )
+from .models.agent_options import AgentOptions
 from .models.stream_event import StreamEvent
 from ..core.capabilities import ProviderCapabilities
 
