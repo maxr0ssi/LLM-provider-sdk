@@ -97,17 +97,21 @@ def mock_openai_sdk():
                 mock_agent.input_guardrails = input_guardrails or []
                 return mock_agent
             
+            # Mock ModelSettings (not installed in CI)
+            MockModelSettings = type('ModelSettings', (), {'__init__': lambda self, **kw: None})
+
             with patch('steer_llm_sdk.integrations.agents.openai.adapter.Agent', side_effect=mock_agent_constructor):
                 with patch('steer_llm_sdk.integrations.agents.openai.adapter.Runner', mock_runner):
                     with patch('steer_llm_sdk.integrations.agents.openai.adapter.function_tool', mock_function_tool):
                         with patch('steer_llm_sdk.integrations.agents.openai.adapter.GuardrailFunctionOutput', MockGuardrailOutput):
-                            with patch('steer_llm_sdk.integrations.agents.openai.tools.function_tool', mock_function_tool):
-                                yield {
-                                    'agent': mock_agent,
-                                    'runner': mock_runner,
-                                    'function_tool': mock_function_tool,
-                                    'guardrail_output': MockGuardrailOutput
-                                }
+                            with patch('steer_llm_sdk.integrations.agents.openai.adapter.ModelSettings', MockModelSettings):
+                                with patch('steer_llm_sdk.integrations.agents.openai.tools.function_tool', mock_function_tool):
+                                    yield {
+                                        'agent': mock_agent,
+                                        'runner': mock_runner,
+                                        'function_tool': mock_function_tool,
+                                        'guardrail_output': MockGuardrailOutput
+                                    }
 
 
 @pytest.fixture

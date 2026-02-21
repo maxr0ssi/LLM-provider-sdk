@@ -111,12 +111,14 @@ def mock_openai_sdk():
                 return mock_agent
 
             mock_ft = lambda fn: fn  # noqa: E731
+            MockModelSettings = type("ModelSettings", (), {"__init__": lambda self, **kw: None})
 
             with patch("steer_llm_sdk.integrations.agents.openai.adapter.Agent", side_effect=mock_agent_ctor):
                 with patch("steer_llm_sdk.integrations.agents.openai.adapter.Runner", mock_runner):
                     with patch("steer_llm_sdk.integrations.agents.openai.adapter.function_tool", mock_ft):
-                        with patch("steer_llm_sdk.integrations.agents.openai.tools.function_tool", mock_ft):
-                            yield {"runner": mock_runner, "agent": mock_agent}
+                        with patch("steer_llm_sdk.integrations.agents.openai.adapter.ModelSettings", MockModelSettings):
+                            with patch("steer_llm_sdk.integrations.agents.openai.tools.function_tool", mock_ft):
+                                yield {"runner": mock_runner, "agent": mock_agent}
 
 
 @pytest.fixture

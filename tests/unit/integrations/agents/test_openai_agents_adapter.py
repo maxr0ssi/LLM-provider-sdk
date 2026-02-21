@@ -199,6 +199,19 @@ def agent_options():
 
 
 @pytest.fixture
+def mock_sdk_modules():
+    """Patch all OpenAI Agents SDK symbols so tests work without the real SDK."""
+    with patch('steer_llm_sdk.integrations.agents.openai.adapter.Agent', MockAgent), \
+         patch('steer_llm_sdk.integrations.agents.openai.adapter.Runner', MockRunner), \
+         patch('steer_llm_sdk.integrations.agents.openai.adapter.ModelSettings', MockModelSettings), \
+         patch('steer_llm_sdk.integrations.agents.openai.adapter.function_tool', mock_function_tool), \
+         patch('steer_llm_sdk.integrations.agents.openai.adapter.GuardrailFunctionOutput', MockGuardrailFunctionOutput), \
+         patch('steer_llm_sdk.integrations.agents.openai.tools.AGENTS_SDK_AVAILABLE', True), \
+         patch('steer_llm_sdk.integrations.agents.openai.tools.function_tool', mock_function_tool):
+        yield
+
+
+@pytest.fixture
 def adapter(mock_env):
     """Create OpenAI Agents adapter instance."""
     with patch('steer_llm_sdk.integrations.agents.openai.adapter.AGENTS_SDK_AVAILABLE', True):
@@ -268,31 +281,24 @@ class TestOpenAIAgentAdapter:
                 assert prepared.agent.model_settings.temperature == 0.0
     
     @pytest.mark.asyncio
-    async def test_run_non_streaming(self, adapter, sample_agent_definition, agent_options):
+    async def test_run_non_streaming(self, adapter, mock_sdk_modules, sample_agent_definition, agent_options):
         """Test non-streaming agent execution."""
-        # Prepare agent
-        with patch('steer_llm_sdk.integrations.agents.openai.adapter.Agent', MockAgent):
-            with patch('steer_llm_sdk.integrations.agents.openai.adapter.ModelSettings', MockModelSettings):
-                with patch('steer_llm_sdk.integrations.agents.openai.adapter.function_tool', mock_function_tool):
-                    prepared = await adapter.prepare(sample_agent_definition, agent_options)
-        
-        # Run agent
-        with patch('steer_llm_sdk.integrations.agents.openai.adapter.Runner', MockRunner):
-            result = await adapter.run(prepared, {"query": "test question"})
-            
-            assert result.content == "Test response"
-            assert result.usage["prompt_tokens"] == 10
-            assert result.usage["completion_tokens"] == 20
-            assert result.usage["total_tokens"] == 30
-            assert result.model == "gpt-4"
-            assert result.provider == "openai"
-            assert result.runtime == "openai_agents"
-            assert result.trace_id == "trace-123"
-            assert result.request_id == "req-456"
-            assert result.elapsed_ms >= 0
+        prepared = await adapter.prepare(sample_agent_definition, agent_options)
+        result = await adapter.run(prepared, {"query": "test question"})
+
+        assert result.content == "Test response"
+        assert result.usage["prompt_tokens"] == 10
+        assert result.usage["completion_tokens"] == 20
+        assert result.usage["total_tokens"] == 30
+        assert result.model == "gpt-4"
+        assert result.provider == "openai"
+        assert result.runtime == "openai_agents"
+        assert result.trace_id == "trace-123"
+        assert result.request_id == "req-456"
+        assert result.elapsed_ms >= 0
     
     @pytest.mark.asyncio
-    async def test_run_with_json_output(self, adapter, sample_agent_definition, agent_options):
+    async def test_run_with_json_output(self, adapter, mock_sdk_modules, sample_agent_definition, agent_options):
         """Test execution with JSON schema validation."""
         # Mock Runner to return JSON
         class MockJSONRunner:
@@ -302,21 +308,19 @@ class TestOpenAIAgentAdapter:
                 result.final_output = '{"answer": "42", "confidence": 0.95}'
                 result.usage = {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
                 return result
-        
-        with patch('steer_llm_sdk.integrations.agents.openai.adapter.Agent', MockAgent):
-            with patch('steer_llm_sdk.integrations.agents.openai.adapter.function_tool', mock_function_tool):
-                prepared = await adapter.prepare(sample_agent_definition, agent_options)
-        
+
+        prepared = await adapter.prepare(sample_agent_definition, agent_options)
+
         with patch('steer_llm_sdk.integrations.agents.openai.adapter.Runner', MockJSONRunner):
             result = await adapter.run(prepared, {"query": "What is the answer?"})
-            
+
             assert isinstance(result.content, dict)
             assert result.content["answer"] == "42"
             assert result.content["confidence"] == 0.95
             assert result.final_json == {"answer": "42", "confidence": 0.95}
     
     @pytest.mark.asyncio
-    async def test_run_streaming(self, adapter, sample_agent_definition):
+    async def test_run_streaming(self, adapter, mock_sdk_modules, sample_agent_definition):
         """Test streaming agent execution with event mapping."""
         options = AgentRunOptions(
             runtime="openai_agents",
@@ -325,11 +329,7 @@ class TestOpenAIAgentAdapter:
             request_id="req-stream"
         )
 
-        # Prepare agent
-        with patch('steer_llm_sdk.integrations.agents.openai.adapter.Agent', MockAgent):
-            with patch('steer_llm_sdk.integrations.agents.openai.adapter.ModelSettings', MockModelSettings):
-                with patch('steer_llm_sdk.integrations.agents.openai.adapter.function_tool', mock_function_tool):
-                    prepared = await adapter.prepare(sample_agent_definition, options)
+        prepared = await adapter.prepare(sample_agent_definition, options)
 
         # Use real EventManager with capture callbacks
         events = []
@@ -377,13 +377,9 @@ class TestOpenAIAgentAdapter:
         assert complete_event.metadata["tools_used"] == ["test_tool"]
     
     @pytest.mark.asyncio
-    async def test_error_handling(self, adapter, sample_agent_definition, agent_options):
+    async def test_error_handling(self, adapter, mock_sdk_modules, sample_agent_definition, agent_options):
         """Test error handling and mapping."""
-        # Prepare agent
-        with patch('steer_llm_sdk.integrations.agents.openai.adapter.Agent', MockAgent):
-            with patch('steer_llm_sdk.integrations.agents.openai.adapter.ModelSettings', MockModelSettings):
-                with patch('steer_llm_sdk.integrations.agents.openai.adapter.function_tool', mock_function_tool):
-                    prepared = await adapter.prepare(sample_agent_definition, agent_options)
+        prepared = await adapter.prepare(sample_agent_definition, agent_options)
         
         # Mock Runner to raise error
         class ErrorRunner:
@@ -399,15 +395,11 @@ class TestOpenAIAgentAdapter:
             assert "Rate limit" in str(exc_info.value)
     
     @pytest.mark.asyncio
-    async def test_streaming_error_handling(self, adapter, sample_agent_definition):
+    async def test_streaming_error_handling(self, adapter, mock_sdk_modules, sample_agent_definition):
         """Test error handling in streaming mode."""
         options = AgentRunOptions(runtime="openai_agents", streaming=True)
 
-        # Prepare agent
-        with patch('steer_llm_sdk.integrations.agents.openai.adapter.Agent', MockAgent):
-            with patch('steer_llm_sdk.integrations.agents.openai.adapter.ModelSettings', MockModelSettings):
-                with patch('steer_llm_sdk.integrations.agents.openai.adapter.function_tool', mock_function_tool):
-                    prepared = await adapter.prepare(sample_agent_definition, options)
+        prepared = await adapter.prepare(sample_agent_definition, options)
 
         # Mock Runner to raise error during streaming
         class ErrorStreamResult:
@@ -450,32 +442,28 @@ class TestOpenAIAgentAdapter:
         assert "timeout" in str(error_events[0].error).lower()
     
     @pytest.mark.asyncio
-    async def test_guardrail_validation(self, adapter, sample_agent_definition, agent_options):
+    async def test_guardrail_validation(self, adapter, mock_sdk_modules, sample_agent_definition, agent_options):
         """Test that guardrails are properly configured for schema validation."""
-        with patch('steer_llm_sdk.integrations.agents.openai.adapter.Agent', MockAgent) as mock_agent:
-            with patch('steer_llm_sdk.integrations.agents.openai.adapter.ModelSettings', MockModelSettings):
-                with patch('steer_llm_sdk.integrations.agents.openai.adapter.function_tool', mock_function_tool):
-                    with patch('steer_llm_sdk.integrations.agents.openai.adapter.GuardrailFunctionOutput', MockGuardrailFunctionOutput):
-                        prepared = await adapter.prepare(sample_agent_definition, agent_options)
+        prepared = await adapter.prepare(sample_agent_definition, agent_options)
 
-                        # Verify guardrails were set
-                        assert len(prepared.agent.output_guardrails) == 1
+        # Verify guardrails were set
+        assert len(prepared.agent.output_guardrails) == 1
 
-                        # Test the guardrail function
-                        guardrail_func = prepared.agent.output_guardrails[0]
+        # Test the guardrail function
+        guardrail_func = prepared.agent.output_guardrails[0]
 
-                        # Valid JSON
-                        valid_result = await guardrail_func(
-                            None, None, '{"answer": "test", "confidence": 0.8}'
-                        )
-                        assert not valid_result.should_block
+        # Valid JSON
+        valid_result = await guardrail_func(
+            None, None, '{"answer": "test", "confidence": 0.8}'
+        )
+        assert not valid_result.should_block
 
-                        # Invalid JSON (missing required field)
-                        invalid_result = await guardrail_func(
-                            None, None, '{"confidence": 0.8}'
-                        )
-                        assert invalid_result.should_block
-                        assert "validation failed" in invalid_result.error_message.lower()
+        # Invalid JSON (missing required field)
+        invalid_result = await guardrail_func(
+            None, None, '{"confidence": 0.8}'
+        )
+        assert invalid_result.should_block
+        assert "validation failed" in invalid_result.error_message.lower()
     
     @pytest.mark.asyncio
     async def test_tool_mapping(self, adapter, sample_agent_definition, agent_options):
