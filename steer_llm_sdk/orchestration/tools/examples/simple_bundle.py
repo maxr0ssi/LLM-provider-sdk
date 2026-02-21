@@ -19,8 +19,7 @@ from ...models.evidence_bundle import (
     Disagreement
 )
 from ....agents.runner.agent_runner import AgentRunner
-from ....agents.models.agent_definition import AgentDefinition
-from ....agents.models.agent_result import AgentResult
+from ....agents.models.agent_definition import AgentDefinition, AgentResult
 
 
 class SimpleBundleTool(BundleTool):

@@ -1,7 +1,6 @@
-from .agent_definition import AgentDefinition
+"""Agent models package."""
+
+from .agent_definition import AgentDefinition, AgentResult
 from .agent_options import AgentOptions
-from .agent_result import AgentResult
 
 __all__ = ["AgentDefinition", "AgentOptions", "AgentResult"]
-
-"""Agent models package."""

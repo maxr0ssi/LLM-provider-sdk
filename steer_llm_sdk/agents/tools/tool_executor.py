@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 from jsonschema import Draft202012Validator
-from .tool_definition import Tool
+from ..models.agent_definition import Tool
 
 
 class ToolExecutor:
@@ -13,5 +13,3 @@ class ToolExecutor:
         if tool.parameters:
             Draft202012Validator(tool.parameters).validate(args)
         return tool.handler(**args)
-
-

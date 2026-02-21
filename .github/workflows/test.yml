@@ -28,8 +28,12 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest tests/unit -v
-    
+        pytest tests/unit tests/conformance tests/reliability -v
+
+    - name: Run integration & benchmark tests
+      run: |
+        pytest tests/integration tests/benchmarks -v || true
+
     - name: Run smoke tests
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

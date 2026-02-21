@@ -14,7 +14,7 @@ Features:
 - Conversation support
 """
 
-__version__ = "0.3.3"
+__version__ = "0.3.5"
 
 from .api.client import SteerLLMClient, generate
 from .core.routing import (
@@ -28,6 +28,7 @@ from .core.routing import (
     normalize_params,
 )
 # Router instance removed - create with SteerLLMClient instead
+from .agents.models.stream_event import StreamEvent
 from .models.conversation_types import ConversationMessage
 from .models.conversation_types import TurnRole as ConversationRole
 from .models.generation import (
@@ -62,5 +63,8 @@ __all__ = [
     "GenerationResponse",
     "ModelConfig",
     "ConversationMessage",
-    "ConversationRole"
+    "ConversationRole",
+
+    # Streaming
+    "StreamEvent",
 ]

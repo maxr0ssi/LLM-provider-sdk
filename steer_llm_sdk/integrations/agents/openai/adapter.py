@@ -6,9 +6,12 @@ and the OpenAI Agents SDK, handling agent creation, execution, and streaming.
 
 import asyncio
 import json
+import logging
 import os
 import time
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from ....agents.models.agent_definition import AgentDefinition, Tool
 from ....agents.validators.json_schema import validate_json_schema
@@ -95,18 +98,18 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
         tool_warnings = []
 
         if definition.tools:
-            print(f"[ADAPTER] Converting {len(definition.tools)} tools to SDK format")
+            logger.debug(f"Converting {len(definition.tools)} tools to SDK format")
             # Validate tools
             for tool in definition.tools:
-                print(f"[ADAPTER]   - {tool.name}: {tool.description[:80]}...")
+                logger.debug(f"  - {tool.name}: {tool.description[:80]}...")
                 warnings = validate_tool_compatibility(tool)
                 if warnings:
-                    print(f"[ADAPTER]     WARNINGS: {warnings}")
+                    logger.warning(f"  WARNINGS for {tool.name}: {warnings}")
                     tool_warnings.extend(warnings)
 
             # Convert to SDK format
             sdk_tools = convert_tools_to_sdk_format(definition.tools)
-            print(f"[ADAPTER] Converted to {len(sdk_tools)} SDK tools")
+            logger.debug(f"Converted to {len(sdk_tools)} SDK tools")
         
         # Get model capabilities for normalization
         capabilities = get_capabilities_for_model(definition.model)
@@ -203,7 +206,7 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
             output_guardrails=guardrails if guardrails else []  # Empty list not None
         )
 
-        print(f"[ADAPTER] Agent created successfully")
+        logger.debug("Agent created successfully")
         
         # Store prepared state
         prepared = PreparedRun(
@@ -219,7 +222,8 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
                 "request_id": options.request_id,
                 "streaming_options": options.streaming_options,  # Pass through for bridge
                 "tools": definition.tools,  # Store original tools for reference
-                "budget": options.budget  # Store budget for run() to use
+                "budget": options.budget,  # Store budget for run() to use
+                "max_tool_calls": options.max_tool_calls
             },
             metadata={
                 "prepare_time_ms": int((time.time() - start_time) * 1000),
@@ -244,7 +248,11 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
         # Run the agent asynchronously
         try:
             # Use native async Runner.run() method
-            result = await Runner.run(prepared.agent, user_input)
+            max_turns = prepared.config.get("max_tool_calls")
+            if max_turns:
+                result = await Runner.run(prepared.agent, user_input, max_turns=max_turns)
+            else:
+                result = await Runner.run(prepared.agent, user_input)
             
             # Extract content and usage
             content = result.final_output
@@ -319,9 +327,8 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
         # Format user input with variables
         user_input = prepared.config["user_template"].format(**variables)
 
-        # Extract budget constraints
-        budget = prepared.config.get("budget", {})
-        max_turns = budget.get("turns") if budget else None
+        # Extract pre-resolved max_tool_calls (set by agent_runner.py)
+        max_turns = prepared.config.get("max_tool_calls")
 
         # Create streaming bridge
         bridge = AgentStreamingBridge(

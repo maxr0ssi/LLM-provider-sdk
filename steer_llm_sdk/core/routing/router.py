@@ -6,10 +6,32 @@ from typing import Any, AsyncGenerator, Dict, List, Union, Optional
 
 from ...models.conversation_types import ConversationMessage
 from ...models.generation import GenerationParams, GenerationResponse, ProviderType
-from ...providers.anthropic.adapter import AnthropicProvider
-from ...providers.openai.adapter import OpenAIProvider
-from ...providers.xai.adapter import XAIProvider
 from ...providers.base import ProviderError
+
+
+# Extras name for install instructions
+_EXTRAS_MAP = {
+    ProviderType.OPENAI: "openai",
+    ProviderType.ANTHROPIC: "anthropic",
+    ProviderType.XAI: "xai",
+}
+
+
+def _try_import_provider(provider_type: ProviderType):
+    """Lazy-import a provider adapter, returning None if its SDK isn't installed."""
+    try:
+        if provider_type == ProviderType.OPENAI:
+            from ...providers.openai.adapter import OpenAIProvider
+            return OpenAIProvider
+        elif provider_type == ProviderType.ANTHROPIC:
+            from ...providers.anthropic.adapter import AnthropicProvider
+            return AnthropicProvider
+        elif provider_type == ProviderType.XAI:
+            from ...providers.xai.adapter import XAIProvider
+            return XAIProvider
+    except ImportError:
+        return None
+    return None
 from ...reliability import (
     AdvancedRetryManager, RetryPolicy, CircuitBreakerManager,
     CircuitBreakerConfig, CircuitState, StreamingRetryManager, StreamingRetryConfig
@@ -32,12 +54,16 @@ class LLMRouter:
     def __init__(self, openai_api_key: Optional[str] = None, 
                  anthropic_api_key: Optional[str] = None,
                  xai_api_key: Optional[str] = None):
-        # Initialize providers with API keys
-        self.providers = {
-            ProviderType.OPENAI: OpenAIProvider(api_key=openai_api_key),
-            ProviderType.ANTHROPIC: AnthropicProvider(api_key=anthropic_api_key),
-            ProviderType.XAI: XAIProvider(api_key=xai_api_key),
-        }
+        # Initialize providers (only those whose SDK is installed)
+        self.providers = {}
+        for ptype, api_key in [
+            (ProviderType.OPENAI, openai_api_key),
+            (ProviderType.ANTHROPIC, anthropic_api_key),
+            (ProviderType.XAI, xai_api_key),
+        ]:
+            cls = _try_import_provider(ptype)
+            if cls:
+                self.providers[ptype] = cls(api_key=api_key)
         
         # Initialize reliability components
         self.retry_manager = AdvancedRetryManager(
@@ -107,12 +133,14 @@ class LLMRouter:
         # Get provider
         provider = self.providers.get(config.provider)
         if not provider:
+            extra = _EXTRAS_MAP.get(config.provider, config.provider.value)
             raise ProviderError(
-                f"Provider {config.provider} not implemented",
-                provider=str(config.provider),
+                f"{config.provider.value} provider not available. "
+                f"Install with: pip install steer-llm-sdk[{extra}]",
+                provider=config.provider.value,
                 status_code=500
             )
-        
+
         # Generate request ID for tracking and ensure in params
         request_id = raw_params.get('request_id', str(uuid.uuid4()))
         raw_params['request_id'] = request_id
@@ -231,12 +259,14 @@ class LLMRouter:
         # Get provider
         provider = self.providers.get(config.provider)
         if not provider:
+            extra = _EXTRAS_MAP.get(config.provider, config.provider.value)
             raise ProviderError(
-                f"Provider {config.provider} not implemented",
-                provider=str(config.provider),
+                f"{config.provider.value} provider not available. "
+                f"Install with: pip install steer-llm-sdk[{extra}]",
+                provider=config.provider.value,
                 status_code=500
             )
-        
+
         # Generate request ID if not provided
         request_id = raw_params.get('request_id', str(uuid.uuid4()))
         provider_name = config.provider.value

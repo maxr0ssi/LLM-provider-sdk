@@ -1,11 +1,13 @@
 """Main client interface for Steer LLM SDK."""
 
 import asyncio
+import json
 import time
 from typing import Optional, List, Union, Dict, Any, Callable, Awaitable
-from ..core.routing import LLMRouter
+from ..core.routing import LLMRouter, get_config, get_available_models, check_lightweight_availability
 from ..models.conversation_types import ConversationMessage
-from ..models.generation import GenerationResponse
+from ..models.generation import GenerationResponse, StreamingResponseWithUsage
+from ..models.streaming import StreamingOptions, JSON_MODE_OPTIONS
 from ..models.events import (
     StreamStartEvent,
     StreamDeltaEvent,
@@ -95,7 +97,6 @@ class SteerLLMClient:
 
         # Allow model-aware defaults if not provided
         if (temperature is None) or (max_tokens is None):
-            from ..core.routing import get_config
             cfg = get_config(model_id)
             if temperature is None:
                 temperature = cfg.temperature
@@ -119,10 +120,9 @@ class SteerLLMClient:
                 params["max_tokens"] = max_tokens
         
         # Get provider from model config
-        from ..core.routing import get_config
         config = get_config(model_id)
         provider = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
-        
+
         # Track metrics
         async with self.metrics_collector.track_request(
             provider=provider,
@@ -174,18 +174,13 @@ class SteerLLMClient:
         """
         # Allow model-aware defaults
         if temperature is None or max_tokens is None:
-            from ..core.routing import get_config
             cfg = get_config(model)
             if temperature is None:
                 temperature = cfg.temperature
             if max_tokens is None:
                 max_tokens = cfg.max_tokens
         params = {"temperature": temperature, "max_tokens": max_tokens, **kwargs}
-        
-        # Import required modules
-        from ..models.generation import StreamingResponseWithUsage
-        from ..models.streaming import StreamingOptions, JSON_MODE_OPTIONS
-        
+
         # Handle streaming options
         if streaming_options is None:
             # Check if JSON mode is requested
@@ -213,10 +208,9 @@ class SteerLLMClient:
         params["streaming_options"] = streaming_options
         
         # Get provider from model config
-        from ..core.routing import get_config
         config = get_config(model)
         provider = config.provider.value if hasattr(config.provider, 'value') else str(config.provider)
-        
+
         # Create stream adapter
         adapter = StreamAdapter(provider)
         adapter.model = model
@@ -273,10 +267,9 @@ class SteerLLMClient:
             # Handle JSON if needed
             if adapter.response_format and adapter.response_format.get("type") == "json_object":
                 try:
-                    import json
                     final_json = json.loads(text)
                     response_wrapper.set_final_json(final_json)
-                except:
+                except (json.JSONDecodeError, ValueError):
                     pass  # Invalid JSON, keep as text
             
             # Set TTFT if available
@@ -301,7 +294,6 @@ class SteerLLMClient:
             raise ValueError("stream(...): 'return_usage' is not supported. Use stream_with_usage(...) instead.")
         # Allow model-aware defaults
         if temperature is None or max_tokens is None:
-            from ..core.routing import get_config
             cfg = get_config(model)
             if temperature is None:
                 temperature = cfg.temperature
@@ -313,12 +305,10 @@ class SteerLLMClient:
     
     def get_available_models(self):
         """Get list of available models."""
-        from ..core.routing import get_available_models
         return get_available_models()
-    
+
     def check_model_availability(self, model: str) -> bool:
         """Check if a specific model is available."""
-        from ..core.routing import check_lightweight_availability
         return check_lightweight_availability(model)
     
     def register_tool(self, tool: Tool) -> None:

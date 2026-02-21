@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExecutionStrategy(str, Enum):
@@ -33,8 +33,7 @@ class PlanRequest(BaseModel):
     circuit_breaker_states: Dict[str, str] = Field(default_factory=dict)
     user_preferences: Dict[str, Any] = Field(default_factory=dict)
     
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class PlanDecision(BaseModel):

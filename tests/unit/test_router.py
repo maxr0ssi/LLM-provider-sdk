@@ -19,9 +19,12 @@ class TestLLMRouter:
     @pytest.fixture
     def router(self, mock_provider):
         """Create a router instance with mocked providers."""
-        with patch('steer_llm_sdk.core.routing.router.OpenAIProvider', Mock(return_value=mock_provider)), \
-             patch('steer_llm_sdk.core.routing.router.AnthropicProvider', Mock(return_value=mock_provider)), \
-             patch('steer_llm_sdk.core.routing.router.XAIProvider', Mock(return_value=mock_provider)):
+        MockProviderCls = Mock(return_value=mock_provider)
+
+        def mock_try_import(provider_type):
+            return MockProviderCls
+
+        with patch('steer_llm_sdk.core.routing.router._try_import_provider', side_effect=mock_try_import):
             return LLMRouter(
                 openai_api_key="test-key",
                 anthropic_api_key="test-key",

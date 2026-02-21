@@ -163,8 +163,6 @@ Thumbs.db
 **/archive/
 
 # Test outputs
-test_*.py
-run_tests.py
 
 # Documentation builds
 docs/_build/

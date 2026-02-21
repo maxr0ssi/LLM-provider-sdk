@@ -156,36 +156,6 @@ class ErrorMetrics(BaseMetrics):
 
 
 @dataclass
-class AgentMetrics:
-    """Legacy agent metrics for backward compatibility."""
-    request_id: Optional[str] = None
-    trace_id: Optional[str] = None
-    model: str = ""
-    latency_ms: int = 0
-    input_tokens: int = 0
-    output_tokens: int = 0
-    cached_tokens: int = 0
-    retries: int = 0
-    error_class: Optional[str] = None
-    tools_used: List[str] = field(default_factory=list)
-    
-    @classmethod
-    def from_request_metrics(cls, metrics: RequestMetrics) -> AgentMetrics:
-        """Create AgentMetrics from RequestMetrics for compatibility."""
-        return cls(
-            request_id=metrics.request_id,
-            model=metrics.model or "",
-            latency_ms=int(metrics.duration_ms or 0),
-            input_tokens=metrics.prompt_tokens,
-            output_tokens=metrics.completion_tokens,
-            cached_tokens=metrics.cached_tokens,
-            retries=0,  # Would come from ReliabilityMetrics
-            error_class=None,
-            tools_used=[]
-        )
-
-
-@dataclass
 class MetricsBatch:
     """Batch of metrics for efficient processing."""
     metrics: List[BaseMetrics] = field(default_factory=list)
