@@ -31,6 +31,7 @@ class AgentRunOptions(BaseModel):
     
     # Budget constraints
     budget: Optional[Dict[str, int]] = Field(None, description="Token/time budget constraints")
+    max_tool_calls: Optional[int] = Field(None, description="Max tool-call turns for agent loop")
     
     # Observability
     idempotency_key: Optional[str] = Field(None, description="Idempotency key for deduplication")

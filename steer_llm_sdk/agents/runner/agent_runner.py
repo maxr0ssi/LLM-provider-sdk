@@ -283,6 +283,12 @@ class AgentRunner:
         # Force streaming mode
         opts.streaming = True
 
+        # Resolve max_tool_calls: explicit field > budget["turns"]
+        stream_budget = opts.budget or {}
+        max_tool_calls = opts.max_tool_calls
+        if max_tool_calls is None and stream_budget:
+            max_tool_calls = stream_budget.get("turns")
+
         # Get runtime adapter
         runtime = get_agent_runtime(opts.runtime)
 
@@ -299,7 +305,8 @@ class AgentRunner:
             trace_id=opts.trace_id,
             request_id=opts.metadata.get("request_id") if opts.metadata else None,
             streaming_options=opts.metadata.get("streaming_options") if opts.metadata else None,
-            metadata=opts.metadata or {}
+            metadata=opts.metadata or {},
+            max_tool_calls=max_tool_calls,
         )
 
         # Prepare agent
@@ -396,6 +403,12 @@ class AgentRunner:
         # Get runtime adapter
         runtime = get_agent_runtime(runtime_name)
         
+        # Resolve max_tool_calls: explicit field > budget["turns"]
+        budget = opts.budget or {}
+        max_tool_calls = opts.max_tool_calls
+        if max_tool_calls is None and budget:
+            max_tool_calls = budget.get("turns")
+
         # Convert AgentOptions to AgentRunOptions
         run_options = AgentRunOptions(
             runtime=runtime_name,
@@ -409,9 +422,10 @@ class AgentRunner:
             trace_id=opts.trace_id,
             request_id=opts.metadata.get("request_id") if opts.metadata else None,
             streaming_options=opts.metadata.get("streaming_options") if opts.metadata else None,
-            metadata=opts.metadata or {}
+            metadata=opts.metadata or {},
+            max_tool_calls=max_tool_calls,
         )
-        
+
         # Check idempotency
         if opts.idempotency_key:
             cached = self.idempotency.check_duplicate(opts.idempotency_key)

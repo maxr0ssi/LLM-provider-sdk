@@ -222,7 +222,8 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
                 "request_id": options.request_id,
                 "streaming_options": options.streaming_options,  # Pass through for bridge
                 "tools": definition.tools,  # Store original tools for reference
-                "budget": options.budget  # Store budget for run() to use
+                "budget": options.budget,  # Store budget for run() to use
+                "max_tool_calls": options.max_tool_calls
             },
             metadata={
                 "prepare_time_ms": int((time.time() - start_time) * 1000),
@@ -247,7 +248,11 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
         # Run the agent asynchronously
         try:
             # Use native async Runner.run() method
-            result = await Runner.run(prepared.agent, user_input)
+            max_turns = prepared.config.get("max_tool_calls")
+            if max_turns:
+                result = await Runner.run(prepared.agent, user_input, max_turns=max_turns)
+            else:
+                result = await Runner.run(prepared.agent, user_input)
             
             # Extract content and usage
             content = result.final_output
@@ -322,9 +327,8 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
         # Format user input with variables
         user_input = prepared.config["user_template"].format(**variables)
 
-        # Extract budget constraints
-        budget = prepared.config.get("budget", {})
-        max_turns = budget.get("turns") if budget else None
+        # Extract pre-resolved max_tool_calls (set by agent_runner.py)
+        max_turns = prepared.config.get("max_tool_calls")
 
         # Create streaming bridge
         bridge = AgentStreamingBridge(
