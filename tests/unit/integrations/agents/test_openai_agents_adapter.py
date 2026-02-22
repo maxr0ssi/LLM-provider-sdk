@@ -91,7 +91,10 @@ class MockRunner:
         event2 = _MockEvent("RawResponsesStreamEvent", type="raw_response_event", data=mock_data2)
 
         # Tool call event (RunItemStreamEvent)
-        tool_item = Mock(tool_name="test_tool")
+        tool_raw_item = Mock()
+        tool_raw_item.name = "test_tool"
+        tool_raw_item.call_id = "call_1"
+        tool_item = Mock(raw_item=tool_raw_item)
         event3 = _MockEvent("RunItemStreamEvent", type="run_item_stream_event", name="tool_called", item=tool_item)
 
         mock_choice3 = Mock()
