@@ -93,9 +93,9 @@ class TestSelectorCostFunctions:
         
         # Claude models with cached pricing
         savings = calculate_cache_savings(usage, "claude-3-haiku")
-        # Regular: 0.0003, cached: 0.00007
-        # Savings: 800 * (0.0003 - 0.00007) = 800 * 0.00023 = 0.184
-        assert abs(savings - 0.000184) < 1e-10  # Use approximate equality for float
+        # Regular: 0.00025, cached: 0.00003
+        # Savings: 800 * (0.00025 - 0.00003) = 800 * 0.00022 = 0.176
+        assert abs(savings - 0.000176) < 1e-10  # Use approximate equality for float
         
         # Claude models without explicit cached pricing (estimates 75% savings)
         config = get_config("grok-3-mini")

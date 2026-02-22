@@ -125,3 +125,62 @@ class TestModelConfigPricing:
         assert config.input_cost_per_1k_tokens == 0.0011   # $1.10 per 1M
         assert config.output_cost_per_1k_tokens == 0.0044  # $4.40 per 1M
         assert config.cached_input_cost_per_1k_tokens == 0.000275  # $0.275 per 1M
+
+        # O3
+        config = ModelConfig(**MODEL_CONFIGS["o3"])
+        assert config.input_cost_per_1k_tokens == 0.002    # $2.00 per 1M
+        assert config.output_cost_per_1k_tokens == 0.008   # $8.00 per 1M
+        assert config.cached_input_cost_per_1k_tokens == 0.0005  # $0.50 per 1M
+
+        # GPT-5.1
+        config = ModelConfig(**MODEL_CONFIGS["gpt-5.1"])
+        assert config.input_cost_per_1k_tokens == 0.00125  # $1.25 per 1M
+        assert config.output_cost_per_1k_tokens == 0.01    # $10.00 per 1M
+        assert config.cached_input_cost_per_1k_tokens == 0.000125  # $0.125 per 1M
+
+        # GPT-5.2
+        config = ModelConfig(**MODEL_CONFIGS["gpt-5.2"])
+        assert config.input_cost_per_1k_tokens == 0.00175  # $1.75 per 1M
+        assert config.output_cost_per_1k_tokens == 0.014   # $14.00 per 1M
+        assert config.cached_input_cost_per_1k_tokens == 0.000175  # $0.175 per 1M
+
+    def test_claude_models_pricing(self):
+        """Test specific Anthropic model pricing matches expectations."""
+        # Claude 3 Haiku
+        config = ModelConfig(**MODEL_CONFIGS["claude-3-haiku"])
+        assert config.input_cost_per_1k_tokens == 0.00025   # $0.25 per 1M
+        assert config.output_cost_per_1k_tokens == 0.00125  # $1.25 per 1M
+        assert config.cached_input_cost_per_1k_tokens == 0.00003  # $0.03 per 1M
+
+        # Claude 3.5 Haiku
+        config = ModelConfig(**MODEL_CONFIGS["claude-3-5-haiku-20241022"])
+        assert config.input_cost_per_1k_tokens == 0.0008   # $0.80 per 1M
+        assert config.output_cost_per_1k_tokens == 0.004    # $4.00 per 1M
+        assert config.cached_input_cost_per_1k_tokens == 0.00008  # $0.08 per 1M
+
+        # Claude Haiku 4.5
+        config = ModelConfig(**MODEL_CONFIGS["claude-haiku-4-5"])
+        assert config.input_cost_per_1k_tokens == 0.001    # $1.00 per 1M
+        assert config.output_cost_per_1k_tokens == 0.005    # $5.00 per 1M
+        assert config.cached_input_cost_per_1k_tokens == 0.0001  # $0.10 per 1M
+
+        # Claude Sonnet 4 / 4.5 / 4.6 — all $3/$15/$0.30 per MTok
+        for model_id in ("claude-sonnet-4", "claude-sonnet-4-5", "claude-sonnet-4-6"):
+            config = ModelConfig(**MODEL_CONFIGS[model_id])
+            assert config.input_cost_per_1k_tokens == 0.003, f"{model_id} input"
+            assert config.output_cost_per_1k_tokens == 0.015, f"{model_id} output"
+            assert config.cached_input_cost_per_1k_tokens == 0.0003, f"{model_id} cached"
+
+        # Claude Opus 4 / 4.1 — $15/$75/$1.50 per MTok
+        for model_id in ("claude-opus-4", "claude-opus-4-1"):
+            config = ModelConfig(**MODEL_CONFIGS[model_id])
+            assert config.input_cost_per_1k_tokens == 0.015, f"{model_id} input"
+            assert config.output_cost_per_1k_tokens == 0.075, f"{model_id} output"
+            assert config.cached_input_cost_per_1k_tokens == 0.0015, f"{model_id} cached"
+
+        # Claude Opus 4.5 / 4.6 — $5/$25/$0.50 per MTok
+        for model_id in ("claude-opus-4-5", "claude-opus-4-6"):
+            config = ModelConfig(**MODEL_CONFIGS[model_id])
+            assert config.input_cost_per_1k_tokens == 0.005, f"{model_id} input"
+            assert config.output_cost_per_1k_tokens == 0.025, f"{model_id} output"
+            assert config.cached_input_cost_per_1k_tokens == 0.0005, f"{model_id} cached"

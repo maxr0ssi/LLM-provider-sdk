@@ -32,6 +32,11 @@ MODEL_FAMILIES = {
         "temperature": 0.7,
         "enabled": True,
     },
+    "claude-4": {
+        "provider": "anthropic",
+        "temperature": 0.7,
+        "enabled": True,
+    },
     "grok": {
         "provider": "xai",
         "temperature": 0.7,

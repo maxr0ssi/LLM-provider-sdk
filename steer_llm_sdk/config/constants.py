@@ -8,7 +8,7 @@ See steer_llm_sdk/config/models.py for current pricing.
 """
 
 # Pricing metadata (for auditability)
-LAST_VERIFIED_PRICING_ISO = "2025-08-14"  # YYYY-MM-DD
+LAST_VERIFIED_PRICING_ISO = "2026-02-21"  # YYYY-MM-DD
 
 # Official pricing documentation sources
 PRICING_SOURCE_URLS = (

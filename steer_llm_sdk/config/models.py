@@ -124,6 +124,28 @@ MODEL_CONFIGS = {
         "output_cost_per_1k_tokens": 0.12
     }),
 
+    "gpt-5.1": create_model_config("gpt-5", "gpt-5.1", {
+        "name": "GPT-5.1",
+        "display_name": "GPT-5.1",
+        "description": "Enhanced GPT-5 with improved reasoning and instruction following",
+        "max_tokens": 32768,
+        "context_length": 256000,
+        "input_cost_per_1k_tokens": 0.00125,
+        "output_cost_per_1k_tokens": 0.01,
+        "cached_input_cost_per_1k_tokens": 0.000125
+    }),
+
+    "gpt-5.2": create_model_config("gpt-5", "gpt-5.2", {
+        "name": "GPT-5.2",
+        "display_name": "GPT-5.2",
+        "description": "Latest GPT-5 series with further improvements in reasoning and capabilities",
+        "max_tokens": 32768,
+        "context_length": 256000,
+        "input_cost_per_1k_tokens": 0.00175,
+        "output_cost_per_1k_tokens": 0.014,
+        "cached_input_cost_per_1k_tokens": 0.000175
+    }),
+
     "gpt-4o-2024-05-13": create_model_config("gpt-4", "gpt-4o-2024-05-13", {
         "name": "GPT-4o (2024-05-13)",
         "display_name": "GPT-4o (2024-05-13)",
@@ -155,22 +177,111 @@ MODEL_CONFIGS = {
         "description": "Anthropic's fastest and most cost-effective model.\nGreat balance of speed, intelligence, and affordability",
         "max_tokens": 4096,
         "context_length": 200000,
-        "input_cost_per_1k_tokens": 0.0003,
-        "output_cost_per_1k_tokens": 0.0015,
-        "cached_input_cost_per_1k_tokens": 0.00007
+        "input_cost_per_1k_tokens": 0.00025,
+        "output_cost_per_1k_tokens": 0.00125,
+        "cached_input_cost_per_1k_tokens": 0.00003
     }),
-    
+
     "claude-3-5-haiku-20241022": create_model_config("claude-3", "claude-3-5-haiku-20241022", {
         "name": "Claude 3.5 Haiku",
         "display_name": "Claude 3.5 Haiku",
         "description": "Anthropic's latest fast and efficient model with improved capabilities",
         "max_tokens": 8192,
         "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.0008,
+        "output_cost_per_1k_tokens": 0.004,
+        "cached_input_cost_per_1k_tokens": 0.00008
+    }),
+
+    # Claude 4 family
+    "claude-haiku-4-5": create_model_config("claude-4", "claude-haiku-4-5-20251001", {
+        "name": "Claude Haiku 4.5",
+        "display_name": "Claude Haiku 4.5",
+        "description": "Fast and cost-effective Claude 4 model, ideal for lightweight tasks",
+        "max_tokens": 8192,
+        "context_length": 200000,
         "input_cost_per_1k_tokens": 0.001,
         "output_cost_per_1k_tokens": 0.005,
         "cached_input_cost_per_1k_tokens": 0.0001
     }),
-    
+
+    "claude-sonnet-4": create_model_config("claude-4", "claude-sonnet-4-20250514", {
+        "name": "Claude Sonnet 4",
+        "display_name": "Claude Sonnet 4",
+        "description": "Balanced Claude 4 model with strong reasoning and coding capabilities",
+        "max_tokens": 8192,
+        "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.003,
+        "output_cost_per_1k_tokens": 0.015,
+        "cached_input_cost_per_1k_tokens": 0.0003
+    }),
+
+    "claude-sonnet-4-5": create_model_config("claude-4", "claude-sonnet-4-5-20250929", {
+        "name": "Claude Sonnet 4.5",
+        "display_name": "Claude Sonnet 4.5",
+        "description": "Enhanced Sonnet with improved reasoning, coding, and extended thinking",
+        "max_tokens": 8192,
+        "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.003,
+        "output_cost_per_1k_tokens": 0.015,
+        "cached_input_cost_per_1k_tokens": 0.0003
+    }),
+
+    "claude-sonnet-4-6": create_model_config("claude-4", "claude-sonnet-4-6", {
+        "name": "Claude Sonnet 4.6",
+        "display_name": "Claude Sonnet 4.6",
+        "description": "Latest Sonnet with state-of-the-art performance at the Sonnet tier",
+        "max_tokens": 8192,
+        "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.003,
+        "output_cost_per_1k_tokens": 0.015,
+        "cached_input_cost_per_1k_tokens": 0.0003
+    }),
+
+    "claude-opus-4": create_model_config("claude-4", "claude-opus-4-20250514", {
+        "name": "Claude Opus 4",
+        "display_name": "Claude Opus 4",
+        "description": "Anthropic's most capable model for complex analysis and extended tasks",
+        "max_tokens": 8192,
+        "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.015,
+        "output_cost_per_1k_tokens": 0.075,
+        "cached_input_cost_per_1k_tokens": 0.0015
+    }),
+
+    "claude-opus-4-1": create_model_config("claude-4", "claude-opus-4-1", {
+        "name": "Claude Opus 4.1",
+        "display_name": "Claude Opus 4.1",
+        "description": "Enhanced Opus with improved agentic capabilities",
+        "max_tokens": 8192,
+        "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.015,
+        "output_cost_per_1k_tokens": 0.075,
+        "cached_input_cost_per_1k_tokens": 0.0015
+    }),
+
+    "claude-opus-4-5": create_model_config("claude-4", "claude-opus-4-5-20250827", {
+        "name": "Claude Opus 4.5",
+        "display_name": "Claude Opus 4.5",
+        "description": "Premium Opus model with superior creative and analytical capabilities",
+        "max_tokens": 8192,
+        "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.005,
+        "output_cost_per_1k_tokens": 0.025,
+        "cached_input_cost_per_1k_tokens": 0.0005
+    }),
+
+    "claude-opus-4-6": create_model_config("claude-4", "claude-opus-4-6", {
+        "name": "Claude Opus 4.6",
+        "display_name": "Claude Opus 4.6",
+        "description": "Latest and most capable Opus model with cutting-edge reasoning",
+        "max_tokens": 8192,
+        "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.005,
+        "output_cost_per_1k_tokens": 0.025,
+        "cached_input_cost_per_1k_tokens": 0.0005
+    }),
+
     # xAI models
     "grok-3-mini": create_model_config("grok", "grok-3-mini", {
         "name": "Grok 3 Mini",
@@ -181,7 +292,7 @@ MODEL_CONFIGS = {
         "output_cost_per_1k_tokens": 0.0005
     }),
     
-    # O4 model (OpenAI reasoning)
+    # O-series reasoning models
     "o4-mini": {
         "name": "O4 Mini",
         "display_name": "O4 Mini",
@@ -195,6 +306,21 @@ MODEL_CONFIGS = {
         "input_cost_per_1k_tokens": 0.0011,
         "output_cost_per_1k_tokens": 0.0044,
         "cached_input_cost_per_1k_tokens": 0.000275
+    },
+
+    "o3": {
+        "name": "O3",
+        "display_name": "O3",
+        "provider": "openai",
+        "llm_model_id": "o3",
+        "description": "OpenAI's flagship reasoning model with strong performance across math, coding, and science",
+        "max_tokens": 100000,
+        "temperature": 0.1,
+        "enabled": True,
+        "context_length": 200000,
+        "input_cost_per_1k_tokens": 0.002,
+        "output_cost_per_1k_tokens": 0.008,
+        "cached_input_cost_per_1k_tokens": 0.0005
     },
 }
 

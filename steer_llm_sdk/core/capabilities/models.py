@@ -323,6 +323,31 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
         streaming_delta_format="text"
     ),
     
+    # O3 (reasoning model)
+    "o3": ProviderCapabilities(
+        supports_json_schema=True,
+        supports_streaming=True,
+        supports_tools=False,
+        supports_seed=False,
+        supports_logprobs=False,
+        max_context_length=200000,
+        max_output_tokens=100000,
+        uses_max_completion_tokens=True,
+        uses_max_output_tokens_in_responses_api=True,
+        supports_system_message=True,
+        supports_response_format=True,
+        supports_prompt_caching=True,
+        cache_ttl_seconds=300,
+        has_input_output_pricing=True,
+        has_cached_pricing=True,
+        deterministic_temperature_max=1.0,
+        deterministic_top_p=1.0,
+        supports_temperature=True,
+        requires_temperature_one=True,
+        streaming_includes_usage=True,
+        streaming_delta_format="text"
+    ),
+
     # Anthropic models
     "claude-3-haiku-20240307": ProviderCapabilities(
         supports_json_schema=False,  # No native JSON schema
@@ -469,6 +494,43 @@ MODEL_CAPABILITIES: Dict[str, ProviderCapabilities] = {
 # Add versioned model aliases that point to the same capabilities
 MODEL_CAPABILITIES["o4-mini-2025-04-16"] = MODEL_CAPABILITIES["o4-mini"]
 MODEL_CAPABILITIES["gpt-4.1-mini-2025-04-14"] = MODEL_CAPABILITIES["gpt-4.1-mini"]
+MODEL_CAPABILITIES["gpt-5.1"] = MODEL_CAPABILITIES["gpt-5"]
+MODEL_CAPABILITIES["gpt-5.2"] = MODEL_CAPABILITIES["gpt-5"]
+
+# Claude 4 family — shared capabilities
+_CLAUDE_4_CAPABILITIES = ProviderCapabilities(
+    supports_json_schema=False,
+    supports_streaming=True,
+    supports_tools=True,
+    supports_seed=False,
+    supports_logprobs=False,
+    max_context_length=200000,
+    max_output_tokens=8192,
+    uses_max_completion_tokens=False,
+    uses_max_output_tokens_in_responses_api=False,
+    supports_system_message=True,
+    supports_response_format=False,
+    supports_prompt_caching=True,
+    cache_ttl_seconds=300,
+    has_input_output_pricing=True,
+    has_cached_pricing=True,
+    deterministic_temperature_max=0.0,
+    deterministic_top_p=1.0,
+    supports_temperature=True,
+    supports_multiple_system_messages=True,
+    supports_image_inputs=True,
+    streaming_includes_usage=False,
+    streaming_delta_format="text"
+)
+MODEL_CAPABILITIES["claude-haiku-4-5-20251001"] = _CLAUDE_4_CAPABILITIES
+MODEL_CAPABILITIES["claude-sonnet-4-20250514"] = _CLAUDE_4_CAPABILITIES
+MODEL_CAPABILITIES["claude-sonnet-4-5-20250929"] = _CLAUDE_4_CAPABILITIES
+MODEL_CAPABILITIES["claude-sonnet-4-6"] = _CLAUDE_4_CAPABILITIES
+MODEL_CAPABILITIES["claude-opus-4-20250514"] = _CLAUDE_4_CAPABILITIES
+MODEL_CAPABILITIES["claude-opus-4-1"] = _CLAUDE_4_CAPABILITIES
+MODEL_CAPABILITIES["claude-opus-4-5-20250827"] = _CLAUDE_4_CAPABILITIES
+MODEL_CAPABILITIES["claude-opus-4-6"] = _CLAUDE_4_CAPABILITIES
+
 MODEL_CAPABILITIES["claude-3-5-haiku-20241022"] = ProviderCapabilities(
     supports_json_schema=False,
     supports_streaming=True,
