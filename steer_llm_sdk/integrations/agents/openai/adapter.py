@@ -353,6 +353,7 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
         try:
             # Collect tool usage for metadata
             tools_used = []
+            tool_call_names = {}  # call_id -> tool_name for correlating tool_output events
             usage_was_estimated = False
             
             # Run the agent with streaming
@@ -403,13 +404,29 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
                         if event.name == "tool_called":
                             # Extract tool info from the event
                             tool_name = "unknown"
-                            if hasattr(event, 'item') and hasattr(event.item, 'tool_name'):
-                                tool_name = event.item.tool_name
+                            raw = getattr(event.item, 'raw_item', None)
+                            if raw and hasattr(raw, 'name'):
+                                tool_name = raw.name
                             tools_used.append(tool_name)
+                            if raw and hasattr(raw, 'call_id'):
+                                tool_call_names[raw.call_id] = tool_name
 
                             # Send as metadata-only delta
                             await bridge.on_delta({
                                 "type": "tool_call",
+                                "tool": tool_name,
+                                "event_name": event.name
+                            })
+
+                        elif event.name == "tool_output":
+                            tool_name = "unknown"
+                            raw = getattr(event.item, 'raw_item', None)
+                            if raw:
+                                call_id = raw.get('call_id') if isinstance(raw, dict) else getattr(raw, 'call_id', None)
+                                if call_id and call_id in tool_call_names:
+                                    tool_name = tool_call_names[call_id]
+                            await bridge.on_delta({
+                                "type": "tool_result",
                                 "tool": tool_name,
                                 "event_name": event.name
                             })

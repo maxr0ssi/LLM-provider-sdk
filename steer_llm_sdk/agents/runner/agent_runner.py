@@ -332,6 +332,16 @@ class AgentRunner:
                         metadata={k: v for k, v in event.items() if k not in ("type", "tool", "content")},
                     )
                     await chunk_queue.put(se)
+                elif hasattr(event, 'delta') and isinstance(event.delta, dict) and 'type' in event.delta:
+                    # StreamDeltaEvent wrapping a tool/semantic dict
+                    d = event.delta
+                    se = StreamEvent(
+                        type=d.get("type", "tool_call"),
+                        tool=d.get("tool", ""),
+                        content=d.get("content", ""),
+                        metadata={k: v for k, v in d.items() if k not in ("type", "tool", "content")},
+                    )
+                    await chunk_queue.put(se)
                 else:
                     # Plain text chunk
                     text = event.get_text() if hasattr(event, 'get_text') else str(event)
