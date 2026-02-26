@@ -400,8 +400,9 @@ class AgentRunner:
 
             # Yield usage event from completion data
             if complete_event is not None:
-                usage = getattr(complete_event, 'final_usage', None) or {}
                 meta = getattr(complete_event, 'metadata', {}) or {}
+                # Token data: prefer dataclass field, fall back to metadata dict
+                usage = getattr(complete_event, 'final_usage', None) or meta.get("final_usage") or {}
                 yield StreamEvent(
                     type="usage",
                     metadata={

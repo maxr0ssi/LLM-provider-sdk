@@ -486,6 +486,7 @@ class OpenAIAgentAdapter(AgentRuntimeAdapter):
             # Complete the stream with metadata
             await bridge.on_complete({
                 "final_json": bridge.get_final_json(),
+                "final_usage": final_usage,
                 "tools_used": tools_used,
                 "cost_usd": cost_usd,
                 "ttft_ms": ttft,
