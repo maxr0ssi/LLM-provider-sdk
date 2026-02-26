@@ -357,8 +357,12 @@ class AgentRunner:
             await chunk_queue.put(StreamEvent(type="error", content=str(error)))
             stream_done.set()
 
+        complete_event = None
+
         async def on_complete(event):
-            """Signal completion."""
+            """Signal completion and capture usage data."""
+            nonlocal complete_event
+            complete_event = event
             stream_done.set()
 
         # Create event manager with callbacks
@@ -393,6 +397,20 @@ class AgentRunner:
                     if stream_done.is_set() and chunk_queue.empty():
                         break
                     continue
+
+            # Yield usage event from completion data
+            if complete_event is not None:
+                usage = getattr(complete_event, 'final_usage', None) or {}
+                meta = getattr(complete_event, 'metadata', {}) or {}
+                yield StreamEvent(
+                    type="usage",
+                    metadata={
+                        "usage": usage,
+                        "cost_usd": meta.get("cost_usd"),
+                        "duration_ms": getattr(complete_event, 'duration_ms', None),
+                        "tools_used": meta.get("tools_used", []),
+                    },
+                )
 
             # Check for errors
             if stream_error:
